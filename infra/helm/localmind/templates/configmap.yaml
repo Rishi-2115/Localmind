@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "localmind.fullname" . }}-config
+  labels:
+    app.kubernetes.io/name: {{ include "localmind.name" . }}
+data:
+  POSTGRES_SERVER: {{ include "localmind.fullname" . }}-postgres
+  POSTGRES_USER: "user"
+  POSTGRES_DB: "localmind"
+  REDIS_HOST: {{ include "localmind.fullname" . }}-redis
+  REDIS_PORT: "6379"
+  MINIO_ENDPOINT: {{ include "localmind.fullname" . }}-minio:9000
+  OLLAMA_BASE_URL: http://{{ include "localmind.fullname" . }}-ollama:11434
+  DEFAULT_ADMIN_EMAIL: "admin@localmind.in"
+  DEFAULT_TENANT_ID: {{ .Values.global.tenantId | default "pilot-lawfirm-01" | quote }}
+  LOG_LEVEL: "INFO"
+  CELERY_BROKER_URL: redis://{{ include "localmind.fullname" . }}-redis:6379/0
+  CELERY_RESULT_BACKEND: redis://{{ include "localmind.fullname" . }}-redis:6379/0

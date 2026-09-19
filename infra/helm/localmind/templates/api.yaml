@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "localmind.fullname" . }}-api
+  labels:
+    app.kubernetes.io/name: {{ include "localmind.name" . }}-api
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "localmind.name" . }}-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "localmind.name" . }}-api
+    spec:
+      containers:
+        - name: api
+          image: {{ .Values.api.image }}
+          ports:
+            - containerPort: 8000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: {{ include "localmind.fullname" . }}-config
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "localmind.fullname" . }}-secrets
+                  key: POSTGRES_PASSWORD
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "localmind.fullname" . }}-secrets
+                  key: MINIO_ACCESS_KEY
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "localmind.fullname" . }}-secrets
+                  key: MINIO_SECRET_KEY
+            - name: DEFAULT_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "localmind.fullname" . }}-secrets
+                  key: DEFAULT_ADMIN_PASSWORD
+            - name: DATABASE_URL
+              value: "postgresql+asyncpg://user:$(POSTGRES_PASSWORD)@{{ include "localmind.fullname" . }}-postgres:5432/localmind"
+          resources:
+{{ toYaml .Values.api.resources | indent 12 }}
+          volumeMounts:
+            - name: faiss-indexes
+              mountPath: /tmp/faiss_indexes
+            - name: upload-data
+              mountPath: /tmp/uploads
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+      volumes:
+        - name: faiss-indexes
+          emptyDir: {}
+        - name: upload-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "localmind.fullname" . }}-api
+  labels:
+    app.kubernetes.io/name: {{ include "localmind.name" . }}-api
+spec:
+  ports:
+    - port: 8000
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: {{ include "localmind.name" . }}-api

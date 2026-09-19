@@ -1,0 +1,196 @@
+version: "3.8"
+
+services:
+  # ─── Database ─────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+      - POSTGRES_DB=localmind
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d localmind"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ─── Redis (Broker & Cache) ───────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ─── MinIO (Tenant Blob Storage) ──────────────────────────────
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # Web Console
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ─── Ollama (Local LLM Inference) ──────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 30s # Allow time for service to start
+    restart: unless-stopped
+
+  # ─── Ollama Model Initialization (Init Container) ───────────────
+  ollama-init:
+    image: curlimages/curl:latest
+    entrypoint: ["sh", "-c", "sh /scripts/pull_models.sh"]
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+    volumes:
+      - ./infra/scripts/pull_models.sh:/scripts/pull_models.sh:ro
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: on-failure
+
+  # ─── API Gateway (FastAPI) ────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: ./services/api/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_SERVER=db
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+      - POSTGRES_DB=localmind
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - DEFAULT_ADMIN_EMAIL=admin@localmind.in
+      - DEFAULT_ADMIN_PASSWORD=localmind_admin_2027
+      - DEFAULT_TENANT_ID=pilot-lawfirm-01
+      - LOG_LEVEL=INFO
+    volumes:
+      - faiss_indexes:/tmp/faiss_indexes # Shared FAISS index cache
+      - upload_data:/tmp/uploads # Temporary uploads (for backup)
+      - ./services/api/app:/app/app # Hot-reload app code
+      - ./ml:/app/ml # Hot-reload ml code
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # ─── Celery Ingestion Worker ───────────────────────────────────
+  ingestion:
+    build:
+      context: .
+      dockerfile: ./services/ingestion/Dockerfile
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - POSTGRES_SERVER=db
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+      - POSTGRES_DB=localmind
+      - DATABASE_URL=postgresql+asyncpg://user:pass@db:5432/localmind
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+      - LOG_LEVEL=INFO
+    volumes:
+      - faiss_indexes:/tmp/faiss_indexes # Shared FAISS index cache
+      - upload_data:/tmp/uploads # Temporary uploads (for backup)
+      - ./services/ingestion:/app/ingestion
+      - ./ml:/app/ml
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── React Frontend (Vite Dev Server) ──────────────────────────
+  web:
+    build:
+      context: ./services/web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_BASE=http://localhost:8000/api/v1
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+    driver: local
+  minio_data:
+    driver: local
+  ollama_data:
+    driver: local
+  faiss_indexes:
+    driver: local
+  upload_data:
+    driver: local
+
+networks:
+  default:
+    name: localmind
+    driver: bridge

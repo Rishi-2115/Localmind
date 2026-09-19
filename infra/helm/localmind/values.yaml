@@ -1,0 +1,93 @@
+global:
+  tenantId: ""
+
+api:
+  image: "ghcr.io/your-org/localmind-api:latest"
+  replicas: 1
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+ingestion:
+  image: "ghcr.io/your-org/localmind-ingestion:latest"
+  replicas: 1
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 100m
+      memory: 512Mi
+
+web:
+  image: "ghcr.io/your-org/localmind-web:latest"
+  replicas: 1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+postgres:
+  enabled: true
+  storage: 10Gi
+  image: "postgres:15-alpine"
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+redis:
+  enabled: true
+  image: "redis:7-alpine"
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+minio:
+  enabled: true
+  storage: 50Gi
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+persistence:
+  storageClassName: ""
+
+ingress:
+  host: "localmind.example.com"
+  tls:
+    enabled: true
+    clusterIssuer: "letsencrypt-prod"
+
+ollama:
+  enabled: true
+  image: "ollama/ollama:latest"
+  model: "llama3.2:3b"
+  gpu:
+    enabled: false
+  storage: 20Gi
+  resources:
+    limits:
+      cpu: 4000m
+      memory: 12Gi
+    requests:
+      cpu: 1000m
+      memory: 8Gi

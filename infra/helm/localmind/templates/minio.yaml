@@ -1,0 +1,81 @@
+{{- if .Values.minio.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "localmind.fullname" . }}-minio
+  labels:
+    app.kubernetes.io/name: {{ include "localmind.name" . }}-minio
+spec:
+  serviceName: {{ include "localmind.fullname" . }}-minio
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "localmind.name" . }}-minio
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "localmind.name" . }}-minio
+    spec:
+      containers:
+        - name: minio
+          image: minio/minio:latest
+          command: ["server", "/data", "--console-address", ":9001"]
+          ports:
+            - containerPort: 9000
+              name: api
+            - containerPort: 9001
+              name: console
+          envFrom:
+            - configMapRef:
+                name: {{ include "localmind.fullname" . }}-config
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "localmind.fullname" . }}-secrets
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "localmind.fullname" . }}-secrets
+                  key: MINIO_ROOT_PASSWORD
+          resources:
+{{ toYaml .Values.minio.resources | indent 12 }}
+          volumeMounts:
+            - name: minio-data
+              mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: minio-data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        {{- if .Values.persistence.storageClassName }}
+        storageClassName: {{ .Values.persistence.storageClassName | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.minio.storage }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "localmind.fullname" . }}-minio
+  labels:
+    app.kubernetes.io/name: {{ include "localmind.name" . }}-minio
+spec:
+  ports:
+    - port: 9000
+      targetPort: api
+      name: api
+    - port: 9001
+      targetPort: console
+      name: console
+  selector:
+    app.kubernetes.io/name: {{ include "localmind.name" . }}-minio
+{{- end }}

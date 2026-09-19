@@ -1,0 +1,46 @@
+name: CD
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/api/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}/localmind-api:latest
+          
+      - name: Build and push Ingestion image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/ingestion/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}/localmind-ingestion:latest
+
+      - name: Build and push Web image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/web
+          file: services/web/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}/localmind-web:latest

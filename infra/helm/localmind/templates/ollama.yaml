@@ -1,0 +1,94 @@
+{{- if .Values.ollama.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "localmind.fullname" . }}-ollama
+  labels:
+    app.kubernetes.io/name: {{ include "localmind.name" . }}-ollama
+spec:
+  serviceName: {{ include "localmind.fullname" . }}-ollama
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "localmind.name" . }}-ollama
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "localmind.name" . }}-ollama
+    spec:
+      {{- if .Values.ollama.gpu.enabled }}
+      nodeSelector:
+        nvidia.com/gpu: "present" # Example label, adjust to cluster specifics
+      {{- end }}
+      initContainers:
+        - name: ollama-pull
+          image: {{ .Values.ollama.image }}
+          command: ["sh", "-c"]
+          args:
+            - |
+              echo "Starting Ollama server in background to pull model..."
+              ollama serve &
+              SERVER_PID=$!
+              # Wait for the API to come up
+              while ! curl -s http://localhost:11434/api/tags > /dev/null; do sleep 1; done
+              echo "Checking if model {{ .Values.ollama.model }} exists..."
+              if ! ollama list | grep -q "{{ .Values.ollama.model }}"; then
+                echo "Model not found. Pulling {{ .Values.ollama.model }}..."
+                ollama pull {{ .Values.ollama.model }}
+              else
+                echo "Model {{ .Values.ollama.model }} already exists. Skipping pull."
+              fi
+              echo "Shutting down background server..."
+              kill $SERVER_PID
+              wait $SERVER_PID || true
+          volumeMounts:
+            - name: ollama-models
+              mountPath: /root/.ollama
+      containers:
+        - name: ollama
+          image: {{ .Values.ollama.image }}
+          ports:
+            - containerPort: 11434
+              name: http
+          resources:
+            requests:
+{{ toYaml .Values.ollama.resources.requests | indent 14 }}
+            limits:
+{{ toYaml .Values.ollama.resources.limits | indent 14 }}
+              {{- if .Values.ollama.gpu.enabled }}
+              nvidia.com/gpu: 1
+              {{- end }}
+          volumeMounts:
+            - name: ollama-models
+              mountPath: /root/.ollama
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 11434
+            initialDelaySeconds: 15
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: ollama-models
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        {{- if .Values.persistence.storageClassName }}
+        storageClassName: {{ .Values.persistence.storageClassName | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.ollama.storage }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "localmind.fullname" . }}-ollama
+  labels:
+    app.kubernetes.io/name: {{ include "localmind.name" . }}-ollama
+spec:
+  ports:
+    - port: 11434
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: {{ include "localmind.name" . }}-ollama
+{{- end }}

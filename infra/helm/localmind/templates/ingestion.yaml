@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "localmind.fullname" . }}-ingestion
+  labels:
+    app.kubernetes.io/name: {{ include "localmind.name" . }}-ingestion
+spec:
+  replicas: {{ .Values.ingestion.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "localmind.name" . }}-ingestion
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "localmind.name" . }}-ingestion
+    spec:
+      containers:
+        - name: ingestion
+          image: {{ .Values.ingestion.image }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "localmind.fullname" . }}-config
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "localmind.fullname" . }}-secrets
+                  key: POSTGRES_PASSWORD
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "localmind.fullname" . }}-secrets
+                  key: MINIO_ACCESS_KEY
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "localmind.fullname" . }}-secrets
+                  key: MINIO_SECRET_KEY
+            - name: DATABASE_URL
+              value: "postgresql+asyncpg://user:$(POSTGRES_PASSWORD)@{{ include "localmind.fullname" . }}-postgres:5432/localmind"
+          resources:
+{{ toYaml .Values.ingestion.resources | indent 12 }}
+          volumeMounts:
+            - name: faiss-indexes
+              mountPath: /tmp/faiss_indexes
+            - name: upload-data
+              mountPath: /tmp/uploads
+      volumes:
+        - name: faiss-indexes
+          emptyDir: {}
+        - name: upload-data
+          emptyDir: {}

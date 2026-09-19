@@ -1,0 +1,36 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "localmind.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "localmind.name" . }}
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    {{- if .Values.ingress.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer | quote }}
+    {{- end }}
+spec:
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host | quote }}
+      secretName: {{ include "localmind.fullname" . }}-tls
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /api(/|$)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "localmind.fullname" . }}-api
+                port:
+                  number: 8000
+          - path: /()(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "localmind.fullname" . }}-web
+                port:
+                  number: 80
