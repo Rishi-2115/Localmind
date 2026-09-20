@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 REDIS_URL = os.environ.get("CELERY_BROKER_URL", "redis://redis:6379/0")
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql+asyncpg://user:pass@db:5432/localmind")
 MINIO_ENDPOINT = os.environ.get("MINIO_ENDPOINT", "minio:9000")
-MINIO_ACCESS_KEY = os.environ.get("MINIO_ROOT_USER", "minioadmin")
-MINIO_SECRET_KEY = os.environ.get("MINIO_ROOT_PASSWORD", "minioadmin")
+MINIO_ACCESS_KEY = os.environ.get("MINIO_ACCESS_KEY", "minioadmin")
+MINIO_SECRET_KEY = os.environ.get("MINIO_SECRET_KEY", "minioadmin")
 
 # ─── Celery App ─────────────────────────────────────────────────────────
 celery_app = Celery("ingestion", broker=REDIS_URL, backend=REDIS_URL)

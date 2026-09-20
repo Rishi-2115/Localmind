@@ -17,6 +17,7 @@ spec:
       containers:
         - name: ingestion
           image: {{ .Values.ingestion.image }}
+          imagePullPolicy: Never
           envFrom:
             - configMapRef:
                 name: {{ include "localmind.fullname" . }}-config

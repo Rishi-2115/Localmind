@@ -23,6 +23,7 @@ spec:
       initContainers:
         - name: ollama-pull
           image: {{ .Values.ollama.image }}
+          imagePullPolicy: IfNotPresent
           command: ["sh", "-c"]
           args:
             - |
@@ -30,13 +31,20 @@ spec:
               ollama serve &
               SERVER_PID=$!
               # Wait for the API to come up
-              while ! curl -s http://localhost:11434/api/tags > /dev/null; do sleep 1; done
+              while ! ollama list > /dev/null 2>&1; do sleep 1; done
               echo "Checking if model {{ .Values.ollama.model }} exists..."
               if ! ollama list | grep -q "{{ .Values.ollama.model }}"; then
                 echo "Model not found. Pulling {{ .Values.ollama.model }}..."
                 ollama pull {{ .Values.ollama.model }}
               else
                 echo "Model {{ .Values.ollama.model }} already exists. Skipping pull."
+              fi
+              echo "Checking if model {{ .Values.ollama.embedding_model }} exists..."
+              if ! ollama list | grep -q "{{ .Values.ollama.embedding_model }}"; then
+                echo "Model not found. Pulling {{ .Values.ollama.embedding_model }}..."
+                ollama pull {{ .Values.ollama.embedding_model }}
+              else
+                echo "Model {{ .Values.ollama.embedding_model }} already exists. Skipping pull."
               fi
               echo "Shutting down background server..."
               kill $SERVER_PID
@@ -47,6 +55,7 @@ spec:
       containers:
         - name: ollama
           image: {{ .Values.ollama.image }}
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 11434
               name: http

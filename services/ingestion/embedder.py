@@ -23,11 +23,11 @@ async def validate_embedding_model():
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
-                f"{OLLAMA_BASE_URL}/api/embeddings",
-                json={"model": EMBEDDING_MODEL, "prompt": "test"},
+                f"{OLLAMA_BASE_URL}/api/embed",
+                json={"model": EMBEDDING_MODEL, "input": "test"},
             )
             response.raise_for_status()
-            embedding = response.json()["embedding"]
+            embedding = response.json()["embeddings"][0]
             actual_dim = len(embedding)
             
             if actual_dim != EXPECTED_EMBEDDING_DIM:
@@ -56,11 +56,11 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
         for i, text in enumerate(texts):
             try:
                 response = client.post(
-                    f"{OLLAMA_BASE_URL}/api/embeddings",
-                    json={"model": EMBEDDING_MODEL, "prompt": text}
+                    f"{OLLAMA_BASE_URL}/api/embed",
+                    json={"model": EMBEDDING_MODEL, "input": text}
                 )
                 response.raise_for_status()
-                embedding = response.json()["embedding"]
+                embedding = response.json()["embeddings"][0]
                 
                 # Validate dimension
                 if len(embedding) != EXPECTED_EMBEDDING_DIM:

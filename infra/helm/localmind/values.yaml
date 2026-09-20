@@ -72,7 +72,7 @@ persistence:
   storageClassName: ""
 
 ingress:
-  host: "localmind.example.com"
+  host: "localhost"
   tls:
     enabled: true
     clusterIssuer: "letsencrypt-prod"
@@ -81,6 +81,7 @@ ollama:
   enabled: true
   image: "ollama/ollama:latest"
   model: "llama3.2:3b"
+  embedding_model: "nomic-embed-text"
   gpu:
     enabled: false
   storage: 20Gi
@@ -90,4 +91,4 @@ ollama:
       memory: 12Gi
     requests:
       cpu: 1000m
-      memory: 8Gi
+      memory: 4Gi

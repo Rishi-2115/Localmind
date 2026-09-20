@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Settings, Users, Server, Cpu, Database, ShieldAlert, CheckCircle2, XCircle, Activity, ShieldCheck } from 'lucide-react';
 import { getAuthHeaders, API_BASE } from '../store/authStore';
 
 interface User {
@@ -27,7 +28,6 @@ const Admin: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        // Fetch users
         const usersRes = await fetch(`${API_BASE}/admin/users`, {
           headers: getAuthHeaders(),
         });
@@ -35,13 +35,11 @@ const Admin: React.FC = () => {
         const usersData = await usersRes.json();
         setUsers(usersData.users || []);
 
-        // Check API health
         const healthRes = await fetch(`${API_BASE.replace('/api/v1', '')}/health`);
         if (healthRes.ok) {
           setStatus((s) => ({ ...s, api: 'online' }));
         }
 
-        // Check Ollama health (via a quick API call)
         try {
           await fetch('http://localhost:11434/api/tags', {
             mode: 'no-cors',
@@ -58,108 +56,146 @@ const Admin: React.FC = () => {
     };
 
     fetchAdminData();
-    const interval = setInterval(fetchAdminData, 30000); // Refresh every 30s
+    const interval = setInterval(fetchAdminData, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  if (loading) {
-    return (
-      <div className="p-8">
-        <div className="text-gray-500">Loading admin panel...</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold mb-6">Tenant Administration</h1>
-      <p className="text-slate-600 mb-8">Manage users and system infrastructure.</p>
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
-          {error}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* User Management */}
-        <div className="bg-white border p-6 rounded-lg shadow-sm">
-          <h2 className="text-xl font-semibold mb-4">Users ({users.length})</h2>
-          {users.length === 0 ? (
-            <p className="text-slate-500 text-sm">No users yet</p>
-          ) : (
-            <ul className="divide-y text-sm">
-              {users.map((user) => (
-                <li key={user.id} className="py-2 flex justify-between">
-                  <span className="font-mono text-xs text-slate-600">{user.email}</span>
-                  <span
-                    className={`px-2 py-1 rounded text-xs font-medium ${
-                      user.role === 'admin'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-slate-100 text-slate-700'
-                    }`}
-                  >
-                    {user.role}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* System Status */}
-        <div className="bg-white border p-6 rounded-lg shadow-sm">
-          <h2 className="text-xl font-semibold mb-4">System Status</h2>
-          <ul className="space-y-3 text-sm">
-            <li className="flex justify-between items-center">
-              <span className="text-slate-600">API Gateway</span>
-              <div className="flex items-center gap-2">
-                <div
-                  className={`w-2 h-2 rounded-full ${
-                    status.api === 'online' ? 'bg-green-500' : 'bg-red-500'
-                  }`}
-                />
-                <span
-                  className={
-                    status.api === 'online' ? 'text-green-600 font-medium' : 'text-red-600'
-                  }
-                >
-                  {status.api === 'online' ? 'Online' : 'Offline'}
-                </span>
-              </div>
-            </li>
-            <li className="flex justify-between items-center">
-              <span className="text-slate-600">Local LLM (Ollama)</span>
-              <div className="flex items-center gap-2">
-                <div
-                  className={`w-2 h-2 rounded-full ${
-                    status.ollama === 'online' ? 'bg-green-500' : 'bg-red-500'
-                  }`}
-                />
-                <span
-                  className={
-                    status.ollama === 'online' ? 'text-green-600 font-medium' : 'text-red-600'
-                  }
-                >
-                  {status.ollama === 'online' ? 'Online' : 'Offline'}
-                </span>
-              </div>
-            </li>
-            <li className="flex justify-between items-center">
-              <span className="text-slate-600">Vector Cache</span>
-              <span className="text-slate-700 font-medium">Operational</span>
-            </li>
-          </ul>
+    <div className="flex flex-col h-full bg-transparent">
+      {/* Header */}
+      <div className="px-8 py-5 border-b border-slate-800/50 bg-[#0F172A]/40 backdrop-blur-md sticky top-0 z-20">
+        <div className="flex items-center space-x-3">
+          <div className="p-2 bg-slate-500/10 rounded-lg text-slate-400">
+            <Settings size={20} />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-white tracking-tight">Tenant Administration</h1>
+            <p className="text-[13px] text-slate-400 font-medium">Manage users, view system health, and oversee infrastructure.</p>
+          </div>
         </div>
       </div>
 
-      {/* Infrastructure Info */}
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="font-semibold text-blue-900 mb-2">Privacy-First Architecture</h3>
-        <p className="text-blue-800 text-sm">
-          All data processing (document ingestion, embedding, LLM inference) runs locally within your
-          tenant's private infrastructure, with zero external API calls. Full DPDP Act compliance.
-        </p>
+      <div className="flex-1 overflow-y-auto p-8 animate-fade-in">
+        <div className="max-w-5xl mx-auto space-y-6">
+          
+          {error && (
+            <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 px-4 py-3 rounded-xl flex items-center">
+              <ShieldAlert size={18} className="mr-2" />
+              <span className="text-sm font-medium">{error}</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* User Management */}
+            <div className="bg-[#1E293B]/40 border border-slate-700/50 rounded-2xl overflow-hidden backdrop-blur-md flex flex-col">
+              <div className="px-6 py-5 border-b border-slate-700/50 bg-slate-800/30 flex items-center justify-between">
+                <div className="flex items-center space-x-2 text-white">
+                  <Users size={18} className="text-indigo-400" />
+                  <h2 className="text-[15px] font-semibold">Active Users</h2>
+                </div>
+                <span className="bg-indigo-500/20 text-indigo-400 py-0.5 px-2.5 rounded-full text-xs font-bold">{users.length}</span>
+              </div>
+              
+              <div className="p-6 flex-1">
+                {loading ? (
+                  <div className="h-full flex items-center justify-center text-slate-500">
+                    <Activity size={24} className="animate-spin text-indigo-500" />
+                  </div>
+                ) : users.length === 0 ? (
+                  <p className="text-slate-500 text-sm text-center">No users found</p>
+                ) : (
+                  <ul className="space-y-3">
+                    {users.map((user) => (
+                      <li key={user.id} className="p-3 bg-slate-800/40 rounded-xl border border-slate-700/50 flex items-center justify-between hover:bg-slate-800/60 transition-colors">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">
+                            {user.email.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="font-medium text-[13px] text-slate-300">{user.email}</span>
+                        </div>
+                        <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wide uppercase border ${
+                          user.role === 'admin' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                        }`}>
+                          {user.role}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            {/* System Status */}
+            <div className="bg-[#1E293B]/40 border border-slate-700/50 rounded-2xl overflow-hidden backdrop-blur-md flex flex-col">
+              <div className="px-6 py-5 border-b border-slate-700/50 bg-slate-800/30 flex items-center justify-between">
+                <div className="flex items-center space-x-2 text-white">
+                  <Server size={18} className="text-emerald-400" />
+                  <h2 className="text-[15px] font-semibold">Infrastructure Health</h2>
+                </div>
+                {loading && <Activity size={16} className="animate-spin text-slate-500" />}
+              </div>
+              
+              <div className="p-6 space-y-4">
+                <div className="p-4 bg-slate-800/40 rounded-xl border border-slate-700/50 flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-slate-700/50 rounded-lg text-slate-400"><Server size={16} /></div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-200">API Gateway</h3>
+                      <p className="text-[11px] text-slate-500">FastAPI Backend Service</p>
+                    </div>
+                  </div>
+                  <div className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border ${status.api === 'online' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
+                    {status.api === 'online' ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+                    <span className="text-[11px] font-bold uppercase tracking-wider">{status.api}</span>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-800/40 rounded-xl border border-slate-700/50 flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-slate-700/50 rounded-lg text-slate-400"><Cpu size={16} /></div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-200">Local LLM Engine</h3>
+                      <p className="text-[11px] text-slate-500">Ollama Inference Server</p>
+                    </div>
+                  </div>
+                  <div className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border ${status.ollama === 'online' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
+                    {status.ollama === 'online' ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+                    <span className="text-[11px] font-bold uppercase tracking-wider">{status.ollama}</span>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-800/40 rounded-xl border border-slate-700/50 flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-slate-700/50 rounded-lg text-slate-400"><Database size={16} /></div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-200">Semantic Cache</h3>
+                      <p className="text-[11px] text-slate-500">Redis & FAISS Vectors</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border bg-emerald-500/10 border-emerald-500/20 text-emerald-400">
+                    <CheckCircle2 size={14} />
+                    <span className="text-[11px] font-bold uppercase tracking-wider">Operational</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Privacy Banner */}
+          <div className="bg-gradient-to-r from-blue-600/10 to-indigo-600/10 border border-blue-500/20 rounded-2xl p-6 flex items-start space-x-4">
+            <div className="p-3 bg-blue-500/20 rounded-xl text-blue-400 flex-shrink-0">
+              <ShieldCheck size={24} />
+            </div>
+            <div>
+              <h3 className="text-[15px] font-bold text-white tracking-tight mb-1">Privacy-First Architecture</h3>
+              <p className="text-sm text-slate-400 leading-relaxed">
+                All data processing (document ingestion, embedding, LLM inference) runs entirely locally within your private infrastructure. Zero external API calls. Full DPDP Act compliance.
+              </p>
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
   );

@@ -30,11 +30,11 @@ async def _embed_query_with_fallback(query: str) -> list[float]:
     async def embed_call():
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
-                f"{settings.OLLAMA_BASE_URL}/api/embeddings",
-                json={"model": settings.EMBEDDING_MODEL, "prompt": query},
+                f"{settings.OLLAMA_BASE_URL}/api/embed",
+                json={"model": settings.EMBEDDING_MODEL, "input": query},
             )
             response.raise_for_status()
-            return response.json()["embedding"]
+            return response.json()["embeddings"][0]
     
     result = await ollama_circuit_breaker.call(embed_call)
     if isinstance(result, dict) and "error" in result:
@@ -54,10 +54,10 @@ async def generate_response_with_citations(
     """
     async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(
-            f"{settings.OLLAMA_BASE_URL}/api/generate",
+            f"{settings.OLLAMA_BASE_URL}/api/chat",
             json={
                 "model": settings.DEFAULT_MODEL,
-                "prompt": prompt,
+                "messages": [{"role": "user", "content": prompt}],
                 "stream": True,
             },
         )
@@ -66,7 +66,7 @@ async def generate_response_with_citations(
         async for line in response.aiter_lines():
             if line:
                 data = json.loads(line)
-                chunk = data.get("response", "")
+                chunk = data.get("message", {}).get("content", "")
                 if chunk:
                     yield {"token": chunk, "citations": citations}
 
