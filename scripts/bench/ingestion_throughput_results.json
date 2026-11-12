@@ -1,0 +1,23 @@
+{
+  "1": {
+    "worker_count": 1,
+    "num_docs": 20,
+    "total_time_s": 6.37,
+    "avg_time_per_doc_s": 0.319,
+    "throughput_docs_per_min": 188.3
+  },
+  "2": {
+    "worker_count": 2,
+    "num_docs": 20,
+    "total_time_s": 3.19,
+    "avg_time_per_doc_s": 0.159,
+    "throughput_docs_per_min": 376.4
+  },
+  "4": {
+    "worker_count": 4,
+    "num_docs": 20,
+    "total_time_s": 1.59,
+    "avg_time_per_doc_s": 0.08,
+    "throughput_docs_per_min": 753.0
+  }
+}

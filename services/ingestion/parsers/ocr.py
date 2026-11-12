@@ -1,12 +1,22 @@
-import pytesseract
-from PIL import Image
-import fitz
-import io
 import logging
+import io
 
 logger = logging.getLogger(__name__)
 
+try:
+    import pytesseract
+    from PIL import Image
+    import fitz
+except ImportError:
+    pytesseract = None
+    Image = None
+    fitz = None
+
+
 def ocr_pdf(file_path: str) -> str:
+    if pytesseract is None or Image is None or fitz is None:
+        logger.warning("pytesseract/Pillow/fitz not available for OCR fallback")
+        return ""
     try:
         doc = fitz.open(file_path)
         text = ""

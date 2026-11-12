@@ -1,0 +1,54 @@
+{
+  "10000": {
+    "Flat": {
+      "memory_mb": 29.34,
+      "build_time_s": 0.01,
+      "search_p50_ms": 1.964,
+      "search_p95_ms": 3.923,
+      "search_p99_ms": 7.062,
+      "recall_at_5": 1.0
+    },
+    "HNSW": {
+      "memory_mb": 36.0,
+      "build_time_s": 1.762,
+      "search_p50_ms": 1.007,
+      "search_p95_ms": 1.456,
+      "search_p99_ms": 2.078,
+      "recall_at_5": 0.532
+    },
+    "IVF-PQ": {
+      "memory_mb": 9.76,
+      "build_time_s": 2.564,
+      "search_p50_ms": 0.755,
+      "search_p95_ms": 1.164,
+      "search_p99_ms": 1.962,
+      "recall_at_5": 0.104
+    }
+  },
+  "100000": {
+    "Flat": {
+      "memory_mb": 292.97,
+      "build_time_s": 0.126,
+      "search_p50_ms": 18.911,
+      "search_p95_ms": 34.668,
+      "search_p99_ms": 35.99,
+      "recall_at_5": 1.0
+    },
+    "HNSW": {
+      "memory_mb": 334.67,
+      "build_time_s": 65.933,
+      "search_p50_ms": 1.915,
+      "search_p95_ms": 2.954,
+      "search_p99_ms": 4.019,
+      "recall_at_5": 0.086
+    },
+    "IVF-PQ": {
+      "memory_mb": 9.96,
+      "build_time_s": 16.382,
+      "search_p50_ms": 7.204,
+      "search_p95_ms": 17.096,
+      "search_p99_ms": 20.679,
+      "recall_at_5": 0.044
+    }
+  }
+}

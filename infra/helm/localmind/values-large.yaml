@@ -1,0 +1,89 @@
+# LocalMind Profile: Large
+# Enterprise firm-wide deployment (>64GB RAM, Dedicated NVIDIA A10G/L4/A100 GPU)
+
+global:
+  profile: large
+  tenantId: ""
+
+ollama:
+  enabled: true
+  model: "qwen2.5:7b"
+  embedding_model: "nomic-embed-text"
+  env:
+    OLLAMA_NUM_PARALLEL: "8"
+    OLLAMA_MAX_LOADED_MODELS: "3"
+  resources:
+    limits:
+      cpu: 8000m
+      memory: 32Gi
+      nvidia.com/gpu: "1"
+    requests:
+      cpu: 4000m
+      memory: 16Gi
+      nvidia.com/gpu: "1"
+  gpu:
+    enabled: true
+
+api:
+  replicas: 4
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+ingestion:
+  replicas: 4
+  concurrency: 4
+  env:
+    FAISS_SWITCH_THRESHOLD: "2000"
+    FAISS_LARGE_INDEX_TYPE: "HNSW"
+  resources:
+    limits:
+      cpu: 4000m
+      memory: 4Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+web:
+  replicas: 3
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+postgres:
+  storage: 100Gi
+  resources:
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+
+redis:
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+
+minio:
+  storage: 500Gi
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+

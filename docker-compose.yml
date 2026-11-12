@@ -108,6 +108,8 @@ services:
       - ./services/api/app:/app/app # Hot-reload app code
       - ./ml:/app/ml # Hot-reload ml code
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Enable access to native host services on Linux
     depends_on:
       db:
         condition: service_healthy
@@ -149,6 +151,8 @@ services:
       - upload_data:/tmp/uploads # Temporary uploads (for backup)
       - ./services/ingestion:/app/ingestion
       - ./ml:/app/ml
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Enable access to native host services on Linux
     depends_on:
       db:
         condition: service_healthy

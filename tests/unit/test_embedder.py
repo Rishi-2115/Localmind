@@ -5,7 +5,7 @@ from services.ingestion.embedder import validate_embedding_model, embed_texts, E
 @pytest.mark.asyncio
 async def test_validate_embedding_model_success():
     mock_response = MagicMock()
-    mock_response.json.return_value = {"embedding": [0.1] * EXPECTED_EMBEDDING_DIM}
+    mock_response.json.return_value = {"embeddings": [[0.1] * EXPECTED_EMBEDDING_DIM]}
     mock_response.raise_for_status = MagicMock()
 
     with patch("httpx.AsyncClient.post", return_value=mock_response):
@@ -16,7 +16,7 @@ async def test_validate_embedding_model_success():
 async def test_validate_embedding_model_dimension_mismatch():
     mock_response = MagicMock()
     # Return 384 dimensions instead of 768
-    mock_response.json.return_value = {"embedding": [0.1] * 384}
+    mock_response.json.return_value = {"embeddings": [[0.1] * 384]}
     mock_response.raise_for_status = MagicMock()
 
     with patch("httpx.AsyncClient.post", return_value=mock_response):

@@ -31,12 +31,13 @@ def mock_faiss_index(tmp_path):
         
     return retriever, tenant_id
 
-@pytest.mark.asyncio
-async def test_retrieval(mock_faiss_index):
+import asyncio
+
+def test_retrieval(mock_faiss_index):
     retriever, tenant_id = mock_faiss_index
     
     # Query matching vector 0
-    results = await retriever.retrieve(tenant_id, [1.0, 0.0], top_k=1)
+    results = asyncio.run(retriever.retrieve(tenant_id, [1.0, 0.0], top_k=1))
     
     assert len(results) == 1
     assert results[0]["doc_id"] == "doc1"

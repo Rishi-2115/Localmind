@@ -6,6 +6,12 @@ from services.api.app.core.security import get_password_hash
 from services.api.app.models.models import User
 from services.api.app.core.database import get_db
 
+@pytest.fixture(autouse=True)
+def mock_startup():
+    with patch("services.api.app.main.init_db", new_callable=AsyncMock), \
+         patch("services.api.app.main.seed_admin", new_callable=AsyncMock):
+        yield
+
 @pytest.fixture
 def mock_db_with_user():
     user = User(

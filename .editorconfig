@@ -1,0 +1,33 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# Top-most EditorConfig file
+root = true
+
+# Unix-style newlines with a newline ending every file
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+indent_style = space
+indent_size = 4
+
+# Web frontend (TypeScript, React, JSON, CSS, YAML)
+[*.{js,jsx,ts,tsx,json,css,html,yaml,yml}]
+indent_style = space
+indent_size = 2
+
+# Shell scripts
+[*.sh]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+
+# Windows batch & powershell scripts
+[*.{bat,cmd,ps1}]
+end_of_line = crlf
+
+# Makefiles
+[Makefile]
+indent_style = tab
+

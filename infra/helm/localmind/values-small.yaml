@@ -1,0 +1,87 @@
+# LocalMind Profile: Small
+# Suitable for local development, demo environments, and laptops (<16GB RAM)
+
+global:
+  profile: small
+  tenantId: "pilot-lawfirm-01"
+
+ollama:
+  enabled: true
+  model: "llama3.2:3b"
+  embedding_model: "nomic-embed-text"
+  env:
+    OLLAMA_NUM_PARALLEL: "1"
+    OLLAMA_MAX_LOADED_MODELS: "1"
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 6Gi
+    requests:
+      cpu: 500m
+      memory: 2Gi
+  gpu:
+    enabled: false
+
+api:
+  replicas: 1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+ingestion:
+  replicas: 1
+  concurrency: 1
+  env:
+    FAISS_SWITCH_THRESHOLD: "10000"
+    FAISS_LARGE_INDEX_TYPE: "Flat"
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+web:
+  replicas: 1
+  resources:
+    limits:
+      cpu: 250m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+postgres:
+  storage: 5Gi
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+redis:
+  resources:
+    limits:
+      cpu: 250m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+minio:
+  storage: 10Gi
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+

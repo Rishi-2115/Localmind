@@ -3,26 +3,118 @@ name: CI
 on:
   pull_request:
     branches: [ main ]
+  push:
+    branches: [ main ]
 
 jobs:
-  lint-and-test:
+  # ─── 1. Ubuntu Job: Full Pipeline (Compose Smoke + Helm Lint + Kind Deploy) ───
+  ubuntu-full-pipeline:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Set up Python
+
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          
-      - name: Install dependencies
+
+      - name: Install Python dependencies
         run: |
-          pip install ruff pytest
-          
+          python -m pip install --upgrade pip
+          pip install ruff pytest pytest-asyncio numpy psutil faiss-cpu
+
       - name: Lint with Ruff
         run: |
           ruff check .
-          
-      - name: Run Tests
+
+      - name: Run Unit Tests
+        env:
+          LOCALMIND_TESTING: "1"
+          AWS_EC2_METADATA_DISABLED: "true"
+          AWS_DEFAULT_REGION: "us-east-1"
         run: |
-          pytest tests/
+          pytest tests/unit/ -v
+
+      - name: Set up Helm v3
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.14.0'
+
+      - name: Helm Lint (Small, Medium, Large profiles)
+        run: |
+          helm lint ./infra/helm/localmind -f ./infra/helm/localmind/values-small.yaml
+          helm lint ./infra/helm/localmind -f ./infra/helm/localmind/values-medium.yaml
+          helm lint ./infra/helm/localmind -f ./infra/helm/localmind/values-large.yaml
+
+      - name: Create KinD Kubernetes Cluster
+        uses: helm/kind-action@v1.9.0
+        with:
+          cluster_name: localmind-ci-cluster
+
+      - name: Install LocalMind Helm Chart on KinD (Dry-run / Minimal Install)
+        run: |
+          helm install ci-test ./infra/helm/localmind -f ./infra/helm/localmind/values-small.yaml \
+            --set ollama.enabled=false \
+            --wait --timeout 300s
+          kubectl get pods -A
+
+      - name: Docker Compose Smoke Test (Build & Config Validation)
+        run: |
+          docker compose config --quiet
+          docker compose build api ingestion web
+
+  # ─── 2. macOS Job: Lint + Unit Tests Only ──────────────────────────────────────
+  macos-unit-tests:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff pytest pytest-asyncio numpy psutil faiss-cpu
+
+      - name: Lint with Ruff
+        run: |
+          ruff check .
+
+      - name: Run Unit Tests
+        env:
+          LOCALMIND_TESTING: "1"
+          AWS_EC2_METADATA_DISABLED: "true"
+          AWS_DEFAULT_REGION: "us-east-1"
+        run: |
+          pytest tests/unit/ -v
+
+  # ─── 3. Windows Job: Lint + Unit Tests Only ────────────────────────────────────
+  windows-unit-tests:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff pytest pytest-asyncio numpy psutil faiss-cpu
+
+      - name: Lint with Ruff
+        run: |
+          ruff check .
+
+      - name: Run Unit Tests
+        env:
+          LOCALMIND_TESTING: "1"
+          AWS_EC2_METADATA_DISABLED: "true"
+          AWS_DEFAULT_REGION: "us-east-1"
+        run: |
+          pytest tests/unit/ -v

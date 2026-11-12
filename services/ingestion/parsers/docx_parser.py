@@ -1,9 +1,17 @@
-import docx
 import logging
 
 logger = logging.getLogger(__name__)
 
+try:
+    import docx
+except ImportError:
+    docx = None
+
+
 def parse_docx(file_path: str) -> str:
+    if docx is None:
+        logger.error("python-docx is not installed in the current environment")
+        return ""
     try:
         doc = docx.Document(file_path)
         text = "\n".join([paragraph.text for paragraph in doc.paragraphs])

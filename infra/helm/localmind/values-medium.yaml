@@ -1,0 +1,87 @@
+# LocalMind Profile: Medium
+# Suitable for departmental deployment in mid-sized law firms (16GB - 32GB RAM, optional 8GB VRAM)
+
+global:
+  profile: medium
+  tenantId: ""
+
+ollama:
+  enabled: true
+  model: "llama3.2:3b"
+  embedding_model: "nomic-embed-text"
+  env:
+    OLLAMA_NUM_PARALLEL: "4"
+    OLLAMA_MAX_LOADED_MODELS: "2"
+  resources:
+    limits:
+      cpu: 4000m
+      memory: 12Gi
+    requests:
+      cpu: 1000m
+      memory: 4Gi
+  gpu:
+    enabled: false
+
+api:
+  replicas: 2
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+ingestion:
+  replicas: 2
+  concurrency: 2
+  env:
+    FAISS_SWITCH_THRESHOLD: "5000"
+    FAISS_LARGE_INDEX_TYPE: "HNSW"
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+
+web:
+  replicas: 2
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+postgres:
+  storage: 20Gi
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+redis:
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+minio:
+  storage: 50Gi
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
