@@ -19,8 +19,10 @@ import logging
 
 from ..core.dependencies import get_current_active_user
 from ..core.database import get_db
-from ..models.models import User, Document, AuditLog
+from ..models.models import User, Document, AuditLog, ContractRisk
 from ..core.config import settings
+from fastapi.responses import StreamingResponse
+import io
 
 logger = logging.getLogger(__name__)
 
@@ -201,6 +203,32 @@ async def upload_documents(
     }
 
 
+@router.get("/documents")
+async def list_documents(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    List all uploaded documents for the active tenant.
+    """
+    result = await db.execute(
+        select(Document)
+        .where(Document.tenant_id == current_user.tenant_id)
+        .order_by(Document.created_at.desc())
+    )
+    docs = result.scalars().all()
+    return [
+        {
+            "id": d.id,
+            "filename": d.filename,
+            "status": d.status,
+            "created_at": d.created_at,
+            "error_message": d.error_message,
+        }
+        for d in docs
+    ]
+
+
 @router.get("/status/{doc_id}")
 async def get_document_status(
     doc_id: str,
@@ -287,3 +315,90 @@ async def retry_failed_document(
         "doc_id": doc_id,
         "task_id": task.id,
     }
+
+
+@router.get("/risks/{doc_id}")
+async def get_document_contract_risks(
+    doc_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Retrieve automated clause risk & deviation assessment for an ingested document.
+    """
+    result = await db.execute(
+        select(ContractRisk)
+        .where(
+            (ContractRisk.document_id == doc_id)
+            & (ContractRisk.tenant_id == current_user.tenant_id)
+        )
+        .order_by(ContractRisk.page_number.asc())
+    )
+    risks = result.scalars().all()
+    
+    # Calculate overall risk score
+    risk_weights = {"CRITICAL": 10, "HIGH": 7, "MEDIUM": 4, "LOW": 1}
+    total_score = sum(risk_weights.get(r.risk_level, 1) for r in risks)
+    composite_tier = "LOW"
+    if any(r.risk_level == "CRITICAL" for r in risks) or total_score >= 18:
+        composite_tier = "CRITICAL"
+    elif any(r.risk_level == "HIGH" for r in risks) or total_score >= 12:
+        composite_tier = "HIGH"
+    elif total_score >= 6:
+        composite_tier = "MEDIUM"
+
+    return {
+        "document_id": doc_id,
+        "risk_tier": composite_tier,
+        "total_risks_flagged": len(risks),
+        "risks": [
+            {
+                "id": r.id,
+                "clause_type": r.clause_type,
+                "risk_level": r.risk_level,
+                "excerpt": r.excerpt,
+                "page_number": r.page_number,
+                "reasoning": r.reasoning,
+                "recommendation": r.recommendation,
+            }
+            for r in risks
+        ],
+    }
+
+
+@router.get("/file/{doc_id}")
+async def stream_document_file(
+    doc_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Stream raw document file securely from MinIO for in-browser PDF rendering with page citations.
+    """
+    result = await db.execute(
+        select(Document).where(
+            (Document.id == doc_id) & (Document.tenant_id == current_user.tenant_id)
+        )
+    )
+    doc = result.scalars().first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    bucket_name = _get_tenant_bucket_name(current_user.tenant_id)
+    s3_path = f"documents/{doc_id}/{doc.filename}"
+
+    try:
+        response = s3_client.get_object(Bucket=bucket_name, Key=s3_path)
+        content_type = "application/pdf" if doc.filename.lower().endswith(".pdf") else "application/octet-stream"
+        
+        return StreamingResponse(
+            response["Body"],
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f'inline; filename="{doc.filename}"',
+                "Content-Type": content_type,
+            },
+        )
+    except Exception as e:
+        logger.error(f"Failed to fetch document file from MinIO: {e}")
+        raise HTTPException(status_code=404, detail="File could not be retrieved from storage")

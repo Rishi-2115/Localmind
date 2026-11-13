@@ -33,3 +33,17 @@ class AuditLog(Base):
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
     doc_ids_accessed = Column(JSON, nullable=True)
     query_hash = Column(String, nullable=True)
+
+
+class ContractRisk(Base):
+    __tablename__ = "contract_risks"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    document_id = Column(String, ForeignKey("documents.id"), nullable=False, index=True)
+    tenant_id = Column(String, index=True, nullable=False)
+    clause_type = Column(String, nullable=False) # liability, indemnification, termination, non_compete, jurisdiction, confidentiality
+    risk_level = Column(String, nullable=False)  # LOW, MEDIUM, HIGH, CRITICAL
+    excerpt = Column(Text, nullable=False)
+    page_number = Column(Integer, nullable=True)
+    reasoning = Column(Text, nullable=False)
+    recommendation = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

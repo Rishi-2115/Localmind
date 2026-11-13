@@ -13,6 +13,12 @@ from urllib.parse import urlparse
 from celery import Celery
 
 # Import pipeline components
+import sys
+import os
+sys.path.insert(0, "/app")
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../ml")))
+
 from parsers.pdf import parse_pdf
 from parsers.docx_parser import parse_docx
 from parsers.txt import parse_txt
@@ -20,6 +26,14 @@ from parsers.ocr import ocr_pdf
 from chunker import chunk_text
 from embedder import embed_texts, validate_embedding_model
 from indexer import index_chunks
+
+try:
+    from ml.analysis.risk_analyzer import evaluate_document_risks
+except ImportError:
+    try:
+        from analysis.risk_analyzer import evaluate_document_risks
+    except ImportError:
+        evaluate_document_risks = None
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +71,41 @@ def update_doc_status(doc_id: str, status: str, error_msg: str = None):
             )
         conn.commit()
         logger.info(f"Updated document {doc_id} status to {status}")
+    finally:
+        conn.close()
+
+
+def save_contract_risks(tenant_id: str, doc_id: str, risks: list):
+    """Persist analyzed contract clause risks to PostgreSQL."""
+    if not risks:
+        return
+    conn = psycopg2.connect(_RAW_DB_URL)
+    try:
+        with conn.cursor() as cur:
+            # Clean any previous risks for this document if re-indexing
+            cur.execute("DELETE FROM contract_risks WHERE document_id = %s", (doc_id,))
+            for r in risks:
+                cur.execute(
+                    """
+                    INSERT INTO contract_risks 
+                    (document_id, tenant_id, clause_type, risk_level, excerpt, page_number, reasoning, recommendation)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        doc_id,
+                        tenant_id,
+                        r.get("clause_type", "general"),
+                        r.get("risk_level", "MEDIUM"),
+                        r.get("excerpt", ""),
+                        r.get("page_number", 1),
+                        r.get("reasoning", ""),
+                        r.get("recommendation", ""),
+                    ),
+                )
+        conn.commit()
+        logger.info(f"Saved {len(risks)} clause risk items for document {doc_id}")
+    except Exception as e:
+        logger.error(f"Failed to persist contract risks for {doc_id}: {e}")
     finally:
         conn.close()
 
@@ -246,7 +295,18 @@ def process_document(tenant_id: str, doc_id: str, s3_path: str):
         # ─── 6. Index into FAISS ───────────────────────────────────────
         index_chunks(tenant_id, doc_id, chunks, embeddings)
         
-        # ─── 7. Mark as indexed ────────────────────────────────────────
+        # ─── 7. Automated Clause Risk & Deviation Scoring ──────────────
+        if evaluate_document_risks is not None:
+            try:
+                ollama_url = os.environ.get("OLLAMA_BASE_URL", "http://ollama:11434")
+                risks = evaluate_document_risks(chunks, ollama_base_url=ollama_url)
+                save_contract_risks(tenant_id, doc_id, risks)
+            except Exception as risk_err:
+                logger.warning(f"Clause risk audit encountered an error, continuing: {risk_err}")
+        else:
+            logger.warning("Risk analyzer module not loaded, skipping clause risk evaluation.")
+
+        # ─── 8. Mark as indexed ────────────────────────────────────────
         update_doc_status(doc_id, "indexed")
         
         logger.info(f"[Task] Successfully processed document {doc_id}")

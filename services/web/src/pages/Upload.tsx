@@ -1,18 +1,49 @@
-import React, { useState, useCallback } from 'react';
-import { UploadCloud, FileText, X, CheckCircle2, Loader2, AlertCircle, Files } from 'lucide-react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { UploadCloud, FileText, X, CheckCircle2, Loader2, AlertCircle, Files, ShieldAlert, RefreshCw } from 'lucide-react';
 import { getAuthHeaders, API_BASE } from '../store/authStore';
+import { ContractRiskModal } from '../components/ContractRiskModal';
 
 interface UploadTask {
   filename: string;
   taskId: string;
   status: string;
+  createdAt?: string;
 }
 
 const Upload: React.FC = () => {
   const [files, setFiles] = useState<File[]>([]);
   const [tasks, setTasks] = useState<UploadTask[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isLoadingDocs, setIsLoadingDocs] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [activeRiskDoc, setActiveRiskDoc] = useState<{ docId: string; filename: string } | null>(null);
+
+  const fetchExistingDocuments = useCallback(async () => {
+    setIsLoadingDocs(true);
+    try {
+      const res = await fetch(`${API_BASE}/ingest/documents`, {
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const docs = await res.json();
+        const mapped: UploadTask[] = docs.map((d: any) => ({
+          filename: d.filename,
+          taskId: d.id,
+          status: d.status,
+          createdAt: d.created_at,
+        }));
+        setTasks(mapped);
+      }
+    } catch (e) {
+      console.error('Failed to fetch existing documents:', e);
+    } finally {
+      setIsLoadingDocs(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchExistingDocuments();
+  }, [fetchExistingDocuments]);
 
   const handleFiles = (newFiles: FileList | null) => {
     if (!newFiles) return;
@@ -193,10 +224,29 @@ const Upload: React.FC = () => {
           </div>
         )}
 
-        {/* Processing queue */}
-        {tasks.length > 0 && (
-          <div className="mt-12 animate-slide-up">
-            <h2 className="text-[15px] font-semibold text-slate-200 mb-4">Ingestion Queue</h2>
+        {/* Processing queue / Document Library */}
+        <div className="mt-12 animate-slide-up">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-[15px] font-semibold text-slate-200">Indexed Legal Contracts & Documents</h2>
+              <p className="text-xs text-slate-400">All uploaded documents in this tenant, available for Q&A and risk audit.</p>
+            </div>
+            <button
+              onClick={fetchExistingDocuments}
+              disabled={isLoadingDocs}
+              className="flex items-center space-x-1.5 px-3 py-1.5 text-xs text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-lg border border-slate-700/60 transition-colors"
+              title="Refresh Document List"
+            >
+              <RefreshCw size={13} className={isLoadingDocs ? "animate-spin text-blue-400" : ""} />
+              <span>Refresh</span>
+            </button>
+          </div>
+
+          {tasks.length === 0 ? (
+            <div className="p-8 text-center bg-[#1E293B]/20 border border-slate-800 rounded-2xl text-slate-500 text-xs">
+              No documents uploaded yet. Upload a PDF or contract above to begin.
+            </div>
+          ) : (
             <div className="bg-[#1E293B]/40 border border-slate-700/50 rounded-2xl overflow-hidden backdrop-blur-sm">
               <div className="divide-y divide-slate-800/60">
                 {tasks.map((t) => {
@@ -207,27 +257,56 @@ const Upload: React.FC = () => {
                     <div key={t.taskId} className="px-6 py-4 flex items-center justify-between hover:bg-slate-800/30 transition-colors">
                       <div className="flex flex-col">
                         <span className="text-sm font-medium text-slate-200">{t.filename}</span>
-                        <span className="text-xs text-slate-500 font-mono mt-0.5">ID: {t.taskId.slice(0, 12)}…</span>
+                        <div className="flex items-center space-x-2 mt-0.5">
+                          <span className="text-xs text-slate-500 font-mono">ID: {t.taskId.slice(0, 12)}…</span>
+                          {t.createdAt && (
+                            <span className="text-[11px] text-slate-600">
+                              • {new Date(t.createdAt).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       
-                      <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg border ${
-                        isSuccess ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
-                        isFailed ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' :
-                        'bg-blue-500/10 border-blue-500/20 text-blue-400'
-                      }`}>
-                        {getStatusIcon(t.status)}
-                        <span className="text-xs font-semibold tracking-wide uppercase">
-                          {getStatusText(t.status)}
-                        </span>
+                      <div className="flex items-center space-x-3">
+                        <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg border ${
+                          isSuccess ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+                          isFailed ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' :
+                          'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                        }`}>
+                          {getStatusIcon(t.status)}
+                          <span className="text-xs font-semibold tracking-wide uppercase">
+                            {getStatusText(t.status)}
+                          </span>
+                        </div>
+
+                        {isSuccess && (
+                          <button
+                            onClick={() => setActiveRiskDoc({ docId: t.taskId, filename: t.filename })}
+                            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-bold transition-all shadow-sm"
+                            title="View Clause Risk & Deviation Audit"
+                          >
+                            <ShieldAlert size={14} className="text-rose-400" />
+                            <span>Risk Audit</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
                 })}
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
+
+      {/* Contract Risk Audit Modal */}
+      {activeRiskDoc && (
+        <ContractRiskModal
+          docId={activeRiskDoc.docId}
+          filename={activeRiskDoc.filename}
+          onClose={() => setActiveRiskDoc(null)}
+        />
+      )}
     </div>
   );
 };

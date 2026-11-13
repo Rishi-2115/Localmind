@@ -151,6 +151,7 @@ services:
       - upload_data:/tmp/uploads # Temporary uploads (for backup)
       - ./services/ingestion:/app/ingestion
       - ./ml:/app/ml
+      - ./ml:/app/ingestion/ml
     extra_hosts:
       - "host.docker.internal:host-gateway" # Enable access to native host services on Linux
     depends_on:

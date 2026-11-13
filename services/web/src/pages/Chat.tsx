@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Send, Bot, User, FileText, ChevronRight, FileSearch, Sparkles } from 'lucide-react';
+import { Send, Bot, User, FileText, ChevronRight, FileSearch, Sparkles, Eye, ShieldAlert } from 'lucide-react';
 import { getAuthHeaders, API_BASE } from '../store/authStore';
+import { PDFViewerPanel } from '../components/PDFViewerPanel';
+import { ContractRiskModal } from '../components/ContractRiskModal';
 
 interface Citation {
   doc_id: string;
@@ -18,13 +20,32 @@ interface Message {
   isCached?: boolean;
 }
 
+const STORAGE_CHAT_KEY = 'localmind_chat_messages_v1';
+
 const Chat: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_CHAT_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [expandedCitations, setExpandedCitations] = useState<Record<number, boolean>>({});
+  const [activeViewerDoc, setActiveViewerDoc] = useState<{ docId: string; page: number; snippet?: string } | null>(null);
+  const [activeRiskDoc, setActiveRiskDoc] = useState<{ docId: string; filename: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_CHAT_KEY, JSON.stringify(messages));
+    } catch (e) {
+      console.warn('Failed to persist chat messages:', e);
+    }
+  }, [messages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -164,6 +185,20 @@ const Chat: React.FC = () => {
             <p className="text-[13px] text-slate-400 font-medium">Privacy-first. Local models. Zero external APIs.</p>
           </div>
         </div>
+
+        {messages.length > 0 && (
+          <button
+            onClick={() => {
+              if (window.confirm('Clear conversation history?')) {
+                setMessages([]);
+                localStorage.removeItem(STORAGE_CHAT_KEY);
+              }
+            }}
+            className="text-xs text-slate-400 hover:text-slate-200 bg-slate-800/60 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700/50 transition-colors"
+          >
+            Clear Chat
+          </button>
+        )}
       </div>
 
       {/* Messages */}
@@ -245,14 +280,47 @@ const Chat: React.FC = () => {
                           {isExpanded && (
                             <div className="mt-3 grid grid-cols-1 gap-2 animate-fade-in pr-4">
                               {msg.citations!.map((citation, idx) => (
-                                <div key={idx} className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 hover:bg-slate-800 hover:border-slate-600 transition-colors cursor-default group">
-                                  <div className="flex items-center text-xs font-semibold text-blue-400 mb-1.5">
-                                    <FileText size={12} className="mr-1.5" />
-                                    {citation.doc_id}
-                                    <span className="text-slate-500 mx-2">•</span>
-                                    <span className="text-slate-400 font-medium">Page {citation.page}</span>
+                                <div key={idx} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3.5 hover:bg-slate-800/90 hover:border-slate-600 transition-all cursor-default group">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center text-xs font-semibold text-blue-400">
+                                      <FileText size={13} className="mr-1.5" />
+                                      <span className="truncate max-w-[180px]">{citation.doc_id}</span>
+                                      <span className="text-slate-500 mx-2">•</span>
+                                      <span className="text-slate-300 font-semibold bg-slate-700/60 px-2 py-0.5 rounded text-[11px]">
+                                        Page {citation.page}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center space-x-1.5 opacity-90 group-hover:opacity-100 transition-opacity">
+                                      <button
+                                        onClick={() =>
+                                          setActiveViewerDoc({
+                                            docId: citation.doc_id,
+                                            page: typeof citation.page === 'number' ? citation.page : parseInt(String(citation.page)) || 1,
+                                            snippet: citation.preview,
+                                          })
+                                        }
+                                        className="inline-flex items-center space-x-1 text-[11px] font-bold text-blue-300 hover:text-white bg-blue-600/30 hover:bg-blue-600 px-2.5 py-1 rounded-lg border border-blue-500/30 transition-all shadow-sm"
+                                        title="Open interactive side-by-side PDF preview at this exact page"
+                                      >
+                                        <Eye size={12} />
+                                        <span>View in PDF</span>
+                                      </button>
+                                      <button
+                                        onClick={() =>
+                                          setActiveRiskDoc({
+                                            docId: citation.doc_id,
+                                            filename: citation.doc_id,
+                                          })
+                                        }
+                                        className="inline-flex items-center space-x-1 text-[11px] font-bold text-rose-300 hover:text-white bg-rose-600/20 hover:bg-rose-600 px-2.5 py-1 rounded-lg border border-rose-500/30 transition-all shadow-sm"
+                                        title="View automated clause risk & deviation audit"
+                                      >
+                                        <ShieldAlert size={12} />
+                                        <span>Risk Audit</span>
+                                      </button>
+                                    </div>
                                   </div>
-                                  <div className="text-[13px] text-slate-300 italic line-clamp-3 leading-relaxed group-hover:line-clamp-none transition-all">
+                                  <div className="text-[13px] text-slate-300 italic line-clamp-3 leading-relaxed group-hover:line-clamp-none transition-all border-l-2 border-blue-500/40 pl-2.5 py-0.5">
                                     "{citation.preview}"
                                   </div>
                                 </div>
@@ -298,6 +366,35 @@ const Chat: React.FC = () => {
           <p className="text-[11px] text-slate-500">LocalMind AI can make mistakes. Check important information against the original documents.</p>
         </div>
       </div>
+
+      {/* Side-by-Side Interactive PDF Viewer */}
+      {activeViewerDoc && (
+        <div className="fixed inset-y-0 right-0 z-40 flex shadow-2xl">
+          <PDFViewerPanel
+            docId={activeViewerDoc.docId}
+            initialPage={activeViewerDoc.page}
+            highlightText={activeViewerDoc.snippet}
+            onClose={() => setActiveViewerDoc(null)}
+          />
+        </div>
+      )}
+
+      {/* Contract Risk Audit Modal */}
+      {activeRiskDoc && (
+        <ContractRiskModal
+          docId={activeRiskDoc.docId}
+          filename={activeRiskDoc.filename}
+          onClose={() => setActiveRiskDoc(null)}
+          onSelectClause={(page, snippet) => {
+            setActiveRiskDoc(null);
+            setActiveViewerDoc({
+              docId: activeRiskDoc.docId,
+              page,
+              snippet,
+            });
+          }}
+        />
+      )}
     </div>
   );
 };
