@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Copy requirements from services/api
 COPY services/api/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --retries 10 --timeout 120 -i https://pypi.org/simple/ -r requirements.txt
 
 # Copy the ml module
 COPY ml/ ./ml/

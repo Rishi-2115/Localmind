@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, FileText, X } from 'lucide-react';
 import { API_BASE } from '../store/authStore';
+import { useThemeStore } from '../store/themeStore';
 
 interface PDFViewerPanelProps {
   docId: string;
@@ -15,37 +16,56 @@ export const PDFViewerPanel: React.FC<PDFViewerPanelProps> = ({
   highlightText,
   onClose,
 }) => {
+  const { theme } = useThemeStore();
+  const isDark = theme === 'dark';
+
   const [currentPage, setCurrentPage] = useState<number>(initialPage);
   const [zoom, setZoom] = useState<number>(100);
 
   const token = localStorage.getItem('localmind_token') || '';
-  // Direct streaming URL from LocalMind API with token parameter for iframe authorization
-  const fileUrl = `${API_BASE}/ingest/file/${docId}?token=${encodeURIComponent(token)}#page=${currentPage}`;
+  
+  // Build streaming URL with token + dynamic server-side highlight query + anchor page
+  const highlightParam = highlightText ? `&highlight=${encodeURIComponent(highlightText.slice(0, 80))}` : '';
+  const fileUrl = `${API_BASE}/ingest/file/${docId}?token=${encodeURIComponent(token)}${highlightParam}&page=${currentPage}#page=${currentPage}`;
 
   return (
-    <div className="flex flex-col h-full bg-[#0B1120] border-l border-slate-800 animate-slide-left w-full md:w-[480px] lg:w-[580px] flex-shrink-0 z-30">
-      {/* Top Controls Toolbar */}
-      <div className="px-4 py-3 bg-[#0F172A] border-b border-slate-800 flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <div className="p-1.5 bg-blue-500/10 text-blue-400 rounded-lg">
+    <div className={`flex flex-col h-full border-l animate-slide-left w-full md:w-[500px] lg:w-[620px] flex-shrink-0 z-30 transition-all ${
+      isDark 
+        ? 'bg-[#030712] border-orange-500/20 shadow-[-10px_0_30px_rgba(0,0,0,0.8)]' 
+        : 'bg-white border-zinc-200 shadow-xl'
+    }`}>
+      {/* Top Toolbar */}
+      <div className={`px-4 py-3 border-b flex items-center justify-between ${
+        isDark ? 'bg-[#0B132B] border-orange-500/15' : 'bg-zinc-50 border-zinc-200'
+      }`}>
+        <div className="flex items-center space-x-2.5">
+          <div className={`p-1.5 rounded-lg ${
+            isDark ? 'bg-orange-500/15 text-[#FF6B00]' : 'bg-black text-white'
+          }`}>
             <FileText size={16} />
           </div>
-          <span className="text-xs font-semibold text-slate-200">Interactive PDF Viewer</span>
+          <span className={`text-xs font-black ${isDark ? 'text-white' : 'text-black'}`}>
+            Interactive Document Viewer
+          </span>
         </div>
 
         {/* Page navigation */}
-        <div className="flex items-center space-x-2 bg-slate-800/80 px-2 py-1 rounded-lg border border-slate-700/60">
+        <div className={`flex items-center space-x-2 px-2 py-1 rounded-xl border ${
+          isDark ? 'bg-[#030712] border-slate-700' : 'bg-white border-zinc-200'
+        }`}>
           <button
             onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-700 transition-colors"
+            className="p-1 rounded hover:opacity-75 transition-opacity"
             title="Previous Page"
           >
             <ChevronLeft size={14} />
           </button>
-          <span className="text-xs text-slate-300 font-mono font-medium">Page {currentPage}</span>
+          <span className={`text-xs font-mono font-bold ${isDark ? 'text-orange-400' : 'text-black'}`}>
+            Page {currentPage}
+          </span>
           <button
             onClick={() => setCurrentPage((p) => p + 1)}
-            className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-700 transition-colors"
+            className="p-1 rounded hover:opacity-75 transition-opacity"
             title="Next Page"
           >
             <ChevronRight size={14} />
@@ -56,40 +76,52 @@ export const PDFViewerPanel: React.FC<PDFViewerPanelProps> = ({
         <div className="flex items-center space-x-1">
           <button
             onClick={() => setZoom((z) => Math.max(60, z - 10))}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className={`p-1.5 rounded-lg border transition-all ${
+              isDark ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-zinc-100 border-zinc-200 text-black'
+            }`}
             title="Zoom Out"
           >
-            <ZoomOut size={15} />
+            <ZoomOut size={14} />
           </button>
           <button
             onClick={() => setZoom((z) => Math.min(180, z + 10))}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className={`p-1.5 rounded-lg border transition-all ${
+              isDark ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-zinc-100 border-zinc-200 text-black'
+            }`}
             title="Zoom In"
           >
-            <ZoomIn size={15} />
+            <ZoomIn size={14} />
           </button>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors ml-1"
+            className={`p-1.5 rounded-lg border ml-1 transition-all ${
+              isDark ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' : 'bg-zinc-100 border-zinc-200 text-black hover:bg-zinc-200'
+            }`}
             title="Close Viewer"
           >
-            <X size={16} />
+            <X size={15} />
           </button>
         </div>
       </div>
 
-      {/* Contextual Citation Anchor banner */}
+      {/* Anchor Quotation */}
       {highlightText && (
-        <div className="px-4 py-2 bg-blue-500/10 border-b border-blue-500/20 text-xs text-blue-300 flex items-start gap-2">
-          <span className="font-bold uppercase tracking-wider text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded text-blue-200 mt-0.5">
-            Anchor
+        <div className={`px-4 py-2.5 border-b text-xs flex items-start gap-2.5 ${
+          isDark 
+            ? 'bg-orange-500/10 border-orange-500/20 text-orange-200' 
+            : 'bg-yellow-50 border-yellow-200 text-zinc-900'
+        }`}>
+          <span className={`font-black text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded mt-0.5 ${
+            isDark ? 'bg-[#FF6B00] text-black font-extrabold' : 'bg-yellow-300 text-black'
+          }`}>
+            Citation Anchor
           </span>
-          <p className="line-clamp-2 italic leading-relaxed">"{highlightText}"</p>
+          <p className="line-clamp-2 italic leading-relaxed font-mono">"{highlightText}"</p>
         </div>
       )}
 
-      {/* PDF Content Frame */}
-      <div className="flex-1 bg-slate-900 overflow-hidden relative">
+      {/* PDF Frame */}
+      <div className={`flex-1 overflow-hidden relative ${isDark ? 'bg-[#0B132B]' : 'bg-zinc-100'}`}>
         <iframe
           src={`${fileUrl}&zoom=${zoom}`}
           title="Document PDF Viewer"

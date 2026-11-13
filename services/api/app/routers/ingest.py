@@ -21,8 +21,11 @@ from ..core.dependencies import get_current_active_user
 from ..core.database import get_db
 from ..models.models import User, Document, AuditLog, ContractRisk
 from ..core.config import settings
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
+from fastapi import Query
+from typing import Optional
 import io
+import fitz # PyMuPDF
 
 logger = logging.getLogger(__name__)
 
@@ -369,11 +372,15 @@ async def get_document_contract_risks(
 @router.get("/file/{doc_id}")
 async def stream_document_file(
     doc_id: str,
+    highlight: Optional[str] = Query(None, description="Text snippet to dynamically highlight in the PDF"),
+    page: Optional[int] = Query(None, description="Specific page number to focus on"),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Stream raw document file securely from MinIO for in-browser PDF rendering with page citations.
+    Stream document file securely from MinIO. 
+    If a `highlight` query is provided, dynamically annotates the PDF on the fly 
+    with a vibrant yellow/orange highlight over the exact citation snippet!
     """
     result = await db.execute(
         select(Document).where(
@@ -389,14 +396,56 @@ async def stream_document_file(
 
     try:
         response = s3_client.get_object(Bucket=bucket_name, Key=s3_path)
-        content_type = "application/pdf" if doc.filename.lower().endswith(".pdf") else "application/octet-stream"
-        
-        return StreamingResponse(
-            response["Body"],
-            media_type=content_type,
+        raw_bytes = response["Body"].read()
+
+        # If it's a PDF and a highlight query was passed, dynamically add highlight annotation
+        if doc.filename.lower().endswith(".pdf") and highlight and len(highlight.strip()) > 3:
+            try:
+                pdf_doc = fitz.open(stream=raw_bytes, filetype="pdf")
+                search_terms = []
+                cleaned = highlight.strip().replace('"', '').replace("'", "")
+                
+                # Try finding multi-word prefix (first 6-8 words) for reliable matching across linebreaks
+                words = cleaned.split()
+                if len(words) >= 4:
+                    search_terms.append(" ".join(words[:6]))
+                    search_terms.append(" ".join(words[:4]))
+                search_terms.append(cleaned[:40])
+
+                # Pages to search
+                pages_to_check = [page - 1] if page and 1 <= page <= len(pdf_doc) else range(len(pdf_doc))
+                
+                highlighted_any = False
+                for p_idx in pages_to_check:
+                    p = pdf_doc[p_idx]
+                    for term in search_terms:
+                        if not term or len(term) < 4:
+                            continue
+                        rects = p.search_for(term)
+                        if rects:
+                            for rect in rects:
+                                annot = p.add_highlight_annot(rect)
+                                # Cyber Orange / Yellow high-contrast highlight stroke
+                                annot.set_colors(stroke=(1.0, 0.45, 0.0))
+                                annot.update()
+                            highlighted_any = True
+                            break
+                    if highlighted_any:
+                        break
+
+                output_buffer = io.BytesIO()
+                pdf_doc.save(output_buffer)
+                pdf_doc.close()
+                raw_bytes = output_buffer.getvalue()
+            except Exception as annot_err:
+                logger.warning(f"Dynamic PDF annotation failed, returning original PDF: {annot_err}")
+
+        return Response(
+            content=raw_bytes,
+            media_type="application/pdf" if doc.filename.lower().endswith(".pdf") else "application/octet-stream",
             headers={
                 "Content-Disposition": f'inline; filename="{doc.filename}"',
-                "Content-Type": content_type,
+                "Content-Type": "application/pdf" if doc.filename.lower().endswith(".pdf") else "application/octet-stream",
             },
         )
     except Exception as e:

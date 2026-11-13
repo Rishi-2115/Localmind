@@ -1,6 +1,18 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { UploadCloud, FileText, X, CheckCircle2, Loader2, AlertCircle, Files, ShieldAlert, RefreshCw } from 'lucide-react';
+import { 
+  UploadCloud, 
+  FileText, 
+  X, 
+  CheckCircle2, 
+  Loader2, 
+  AlertCircle, 
+  Files, 
+  ShieldAlert, 
+  RefreshCw,
+  FolderOpen
+} from 'lucide-react';
 import { getAuthHeaders, API_BASE } from '../store/authStore';
+import { useThemeStore } from '../store/themeStore';
 import { ContractRiskModal } from '../components/ContractRiskModal';
 
 interface UploadTask {
@@ -11,6 +23,9 @@ interface UploadTask {
 }
 
 const Upload: React.FC = () => {
+  const { theme } = useThemeStore();
+  const isDark = theme === 'dark';
+
   const [files, setFiles] = useState<File[]>([]);
   const [tasks, setTasks] = useState<UploadTask[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -81,19 +96,17 @@ const Upload: React.FC = () => {
       }
 
       const data = await res.json();
-      const newTasks: UploadTask[] = data.tasks.map((t: any) => ({
+      const newTasks: UploadTask[] = (data.tasks || []).map((t: any) => ({
         filename: t.filename,
         taskId: t.doc_id || t.task_id,
-        status: 'processing',
+        status: 'queued',
       }));
 
       setTasks((prev) => [...newTasks, ...prev]);
       setFiles([]);
 
-      // Poll statuses
-      for (const task of newTasks) {
-        pollStatus(task.taskId);
-      }
+      // Start polling
+      newTasks.forEach((t) => pollStatus(t.taskId));
     } catch (err: any) {
       alert(`Upload error: ${err.message}`);
     } finally {
@@ -101,22 +114,24 @@ const Upload: React.FC = () => {
     }
   };
 
-  const pollStatus = async (taskId: string) => {
+  const pollStatus = (docId: string) => {
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`${API_BASE}/ingest/status/${taskId}`, {
+        const res = await fetch(`${API_BASE}/ingest/status/${docId}`, {
           headers: getAuthHeaders(),
         });
-        const data = await res.json();
-
-        setTasks((prev) =>
-          prev.map((t) => (t.taskId === taskId ? { ...t, status: data.status } : t))
-        );
-
-        if (['indexed', 'failed', 'SUCCESS', 'FAILURE'].includes(data.status)) {
-          clearInterval(interval);
+        if (res.ok) {
+          const data = await res.json();
+          setTasks((prev) =>
+            prev.map((t) => (t.taskId === docId ? { ...t, status: data.status } : t))
+          );
+          if (['indexed', 'failed', 'SUCCESS', 'FAILURE'].includes(data.status)) {
+            clearInterval(interval);
+            fetchExistingDocuments();
+          }
         }
-      } catch {
+      } catch (err) {
+        console.error('Polling error:', err);
         clearInterval(interval);
       }
     }, 2000);
@@ -126,57 +141,113 @@ const Upload: React.FC = () => {
     setFiles((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const getStatusIcon = (status: string) => {
-    if (['indexed', 'SUCCESS'].includes(status)) return <CheckCircle2 size={16} className="text-emerald-400" />;
-    if (['failed', 'FAILURE'].includes(status)) return <AlertCircle size={16} className="text-rose-400" />;
-    return <Loader2 size={16} className="text-blue-400 animate-spin" />;
-  };
+  const getStatusBadge = (status: string) => {
+    const isSuccess = ['indexed', 'SUCCESS'].includes(status);
+    const isFailed = ['failed', 'FAILURE'].includes(status);
 
-  const getStatusText = (status: string) => {
-    if (['indexed', 'SUCCESS'].includes(status)) return 'Indexed & Ready';
-    if (['failed', 'FAILURE'].includes(status)) return 'Ingestion Failed';
-    return 'Processing...';
+    if (isSuccess) {
+      return (
+        <div className={`flex items-center space-x-1.5 px-3 py-1 rounded-xl text-xs font-black uppercase border ${
+          isDark ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+        }`}>
+          <CheckCircle2 size={13} />
+          <span>Indexed & Ready</span>
+        </div>
+      );
+    }
+
+    if (isFailed) {
+      return (
+        <div className="flex items-center space-x-1.5 px-3 py-1 rounded-xl text-xs font-black uppercase bg-rose-500/15 border border-rose-500/30 text-rose-500">
+          <AlertCircle size={13} />
+          <span>Failed</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className={`flex items-center space-x-1.5 px-3 py-1 rounded-xl text-xs font-black uppercase border ${
+        isDark ? 'bg-orange-500/15 border-orange-500/30 text-[#FF8533]' : 'bg-yellow-50 border-yellow-200 text-black'
+      }`}>
+        <Loader2 size={13} className="animate-spin" />
+        <span>Processing...</span>
+      </div>
+    );
   };
 
   return (
-    <div className="flex flex-col h-full bg-transparent">
+    <div className={`flex flex-col h-full overflow-y-auto ${isDark ? 'bg-[#030712]' : 'bg-[#FAFAFA]'}`}>
       {/* Header */}
-      <div className="px-8 py-5 border-b border-slate-800/50 bg-[#0F172A]/40 backdrop-blur-md sticky top-0 z-20">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400">
-            <Files size={20} />
+      <div className={`px-8 py-5 border-b flex items-center justify-between sticky top-0 z-20 backdrop-blur-xl ${
+        isDark ? 'bg-[#0B132B]/80 border-orange-500/15' : 'bg-white/90 border-zinc-200 shadow-sm'
+      }`}>
+        <div className="flex items-center space-x-3.5">
+          <div className={`p-2.5 rounded-xl border ${
+            isDark ? 'bg-orange-500/10 border-orange-500/30 text-[#FF6B00]' : 'bg-black text-white border-black'
+          }`}>
+            <Files size={18} />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">Documents & Ingestion</h1>
-            <p className="text-[13px] text-slate-400 font-medium">Upload legal documents to index them for Copilot Q&A.</p>
+            <h1 className={`text-base font-black tracking-tight ${isDark ? 'text-white' : 'text-black'}`}>
+              Documents & Ingestion Engine
+            </h1>
+            <p className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-zinc-500'}`}>
+              Upload corporate agreements, NDAs, and briefs to parse, chunk, and index into FAISS
+            </p>
           </div>
         </div>
+
+        <button
+          onClick={fetchExistingDocuments}
+          disabled={isLoadingDocs}
+          className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border transition-all ${
+            isDark 
+              ? 'bg-[#030712] border-slate-700 text-slate-300 hover:border-orange-500/40 hover:text-[#FF8533]' 
+              : 'bg-zinc-100 border-zinc-200 text-zinc-800 hover:bg-zinc-200'
+          }`}
+        >
+          <RefreshCw size={13} className={isLoadingDocs ? "animate-spin text-orange-500" : ""} />
+          <span>Refresh</span>
+        </button>
       </div>
 
-      <div className="p-8 max-w-4xl mx-auto w-full animate-fade-in overflow-y-auto">
-        
+      <div className="p-8 max-w-4xl mx-auto w-full space-y-8 animate-fade-in">
         {/* Drop zone */}
         <div
           onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
           onDragLeave={() => setDragActive(false)}
           onDrop={handleDrop}
-          className={`relative overflow-hidden border-2 border-dashed rounded-3xl p-12 text-center transition-all duration-300 ease-out cursor-pointer ${
+          className={`relative border-2 border-dashed rounded-3xl p-12 text-center transition-all cursor-pointer ${
             dragActive
-              ? 'border-blue-500 bg-blue-500/10 scale-[1.02]'
-              : 'border-slate-700 hover:border-slate-600 bg-[#1E293B]/40 hover:bg-[#1E293B]/60'
+              ? isDark 
+                ? 'border-[#FF6B00] bg-orange-500/10 scale-[1.01]' 
+                : 'border-black bg-zinc-100 scale-[1.01]'
+              : isDark
+                ? 'border-orange-500/30 hover:border-[#FF6B00] bg-[#0B132B]/50 hover:bg-[#0B132B]/80'
+                : 'border-zinc-300 hover:border-black bg-white'
           }`}
         >
-          {dragActive && <div className="absolute inset-0 bg-blue-500/5 backdrop-blur-sm z-0" />}
-          
-          <div className="relative z-10 flex flex-col items-center">
-            <div className={`p-4 rounded-full mb-4 transition-colors duration-300 ${dragActive ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-800/80 text-slate-400'}`}>
-              <UploadCloud size={40} className={dragActive ? 'animate-bounce' : ''} />
+          <div className="flex flex-col items-center">
+            <div className={`p-4 rounded-3xl mb-4 transition-all ${
+              isDark 
+                ? 'bg-orange-500/10 text-[#FF6B00] border border-orange-500/30 shadow-[0_0_20px_rgba(255,107,0,0.2)]' 
+                : 'bg-black text-white'
+            }`}>
+              <UploadCloud size={38} className={dragActive ? 'animate-bounce' : ''} />
             </div>
-            <p className="text-lg font-semibold text-white mb-2">Drag & drop files here</p>
-            <p className="text-sm text-slate-400 mb-6">Supported formats: PDF, DOCX, TXT</p>
-            
-            <label className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-xl text-sm font-semibold cursor-pointer transition-all shadow-lg shadow-blue-500/20 active:scale-95">
-              Browse Files
+            <p className={`text-lg font-black mb-1.5 ${isDark ? 'text-white' : 'text-black'}`}>
+              Drag & Drop Confidential Contracts
+            </p>
+            <p className={`text-xs mb-6 ${isDark ? 'text-slate-400' : 'text-zinc-500'}`}>
+              Supported formats: <strong>PDF, DOCX, TXT</strong> • Maximum size 50 MB
+            </p>
+
+            <label className={`inline-flex items-center justify-center px-6 py-2.5 rounded-2xl text-xs font-black cursor-pointer transition-all shadow-md active:scale-95 ${
+              isDark 
+                ? 'bg-gradient-to-r from-orange-500 to-[#FF4500] text-black shadow-orange-500/25 hover:brightness-110' 
+                : 'bg-black text-white hover:bg-zinc-800'
+            }`}>
+              Browse Local Files
               <input
                 id="file-upload-input"
                 type="file"
@@ -189,34 +260,47 @@ const Upload: React.FC = () => {
           </div>
         </div>
 
-        {/* Selected files */}
+        {/* Selected files awaiting upload */}
         {files.length > 0 && (
-          <div className="mt-8 animate-slide-up">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[15px] font-semibold text-slate-200">Ready to Upload ({files.length})</h2>
+          <div className="animate-slide-up">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className={`text-sm font-black ${isDark ? 'text-white' : 'text-black'}`}>
+                Ready for Ingestion ({files.length})
+              </h2>
               <button
                 id="start-upload-btn"
                 onClick={handleUpload}
                 disabled={isUploading}
-                className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white px-5 py-2 rounded-xl text-sm font-semibold transition-all shadow-lg shadow-indigo-500/20 flex items-center space-x-2"
+                className={`px-5 py-2 rounded-xl text-xs font-black transition-all shadow-md flex items-center space-x-2 ${
+                  isDark 
+                    ? 'bg-gradient-to-r from-orange-500 to-[#FF4500] text-black shadow-orange-500/20' 
+                    : 'bg-black text-white hover:bg-zinc-800'
+                }`}
               >
-                {isUploading && <Loader2 size={16} className="animate-spin" />}
-                <span>{isUploading ? 'Uploading...' : `Upload ${files.length} file(s)`}</span>
+                {isUploading && <Loader2 size={14} className="animate-spin" />}
+                <span>{isUploading ? 'Ingesting...' : `Start Ingestion`}</span>
               </button>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
               {files.map((f, i) => (
-                <div key={i} className="flex items-center justify-between bg-[#1E293B]/60 border border-slate-700/50 rounded-xl px-4 py-3 group hover:border-slate-600 transition-colors">
+                <div 
+                  key={i} 
+                  className={`flex items-center justify-between p-3.5 rounded-2xl border ${
+                    isDark ? 'bg-[#0B132B] border-slate-800' : 'bg-white border-zinc-200'
+                  }`}
+                >
                   <div className="flex items-center space-x-3 overflow-hidden">
-                    <FileText size={18} className="text-slate-400 flex-shrink-0" />
-                    <span className="text-sm text-slate-300 font-medium truncate">{f.name}</span>
+                    <FileText size={17} className={isDark ? "text-[#FF6B00]" : "text-black"} />
+                    <span className={`text-xs font-semibold truncate ${isDark ? 'text-slate-200' : 'text-zinc-800'}`}>
+                      {f.name}
+                    </span>
                   </div>
                   <button 
                     onClick={() => removeFile(i)} 
-                    className="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-rose-400/10 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+                    className="text-slate-400 hover:text-rose-500 p-1 rounded-lg transition-colors"
                   >
-                    <X size={16} />
+                    <X size={15} />
                   </button>
                 </div>
               ))}
@@ -224,76 +308,71 @@ const Upload: React.FC = () => {
           </div>
         )}
 
-        {/* Processing queue / Document Library */}
-        <div className="mt-12 animate-slide-up">
-          <div className="flex items-center justify-between mb-4">
+        {/* Contract Registry / Ingested Documents List */}
+        <div>
+          <div className="flex items-center justify-between mb-3.5">
             <div>
-              <h2 className="text-[15px] font-semibold text-slate-200">Indexed Legal Contracts & Documents</h2>
-              <p className="text-xs text-slate-400">All uploaded documents in this tenant, available for Q&A and risk audit.</p>
+              <h2 className={`text-sm font-black ${isDark ? 'text-white' : 'text-black'}`}>
+                Contract Library & Compliance Registry
+              </h2>
+              <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-zinc-500'}`}>
+                Indexed files in this tenant partition available for RAG search and automated risk audits.
+              </p>
             </div>
-            <button
-              onClick={fetchExistingDocuments}
-              disabled={isLoadingDocs}
-              className="flex items-center space-x-1.5 px-3 py-1.5 text-xs text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-lg border border-slate-700/60 transition-colors"
-              title="Refresh Document List"
-            >
-              <RefreshCw size={13} className={isLoadingDocs ? "animate-spin text-blue-400" : ""} />
-              <span>Refresh</span>
-            </button>
           </div>
 
           {tasks.length === 0 ? (
-            <div className="p-8 text-center bg-[#1E293B]/20 border border-slate-800 rounded-2xl text-slate-500 text-xs">
-              No documents uploaded yet. Upload a PDF or contract above to begin.
+            <div className={`p-8 text-center rounded-2xl border text-xs font-medium ${
+              isDark ? 'bg-[#0B132B]/40 border-slate-800 text-slate-500' : 'bg-white border-zinc-200 text-zinc-400'
+            }`}>
+              No contracts ingested yet. Upload an agreement above to begin.
             </div>
           ) : (
-            <div className="bg-[#1E293B]/40 border border-slate-700/50 rounded-2xl overflow-hidden backdrop-blur-sm">
-              <div className="divide-y divide-slate-800/60">
-                {tasks.map((t) => {
-                  const isSuccess = ['indexed', 'SUCCESS'].includes(t.status);
-                  const isFailed = ['failed', 'FAILURE'].includes(t.status);
-                  
-                  return (
-                    <div key={t.taskId} className="px-6 py-4 flex items-center justify-between hover:bg-slate-800/30 transition-colors">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-slate-200">{t.filename}</span>
-                        <div className="flex items-center space-x-2 mt-0.5">
-                          <span className="text-xs text-slate-500 font-mono">ID: {t.taskId.slice(0, 12)}…</span>
-                          {t.createdAt && (
-                            <span className="text-[11px] text-slate-600">
-                              • {new Date(t.createdAt).toLocaleDateString()}
-                            </span>
-                          )}
-                        </div>
+            <div className={`border rounded-3xl overflow-hidden shadow-sm divide-y ${
+              isDark ? 'bg-[#0B132B]/80 border-orange-500/15 divide-slate-800/80' : 'bg-white border-zinc-200 divide-zinc-100'
+            }`}>
+              {tasks.map((t) => {
+                const isSuccess = ['indexed', 'SUCCESS'].includes(t.status);
+                return (
+                  <div key={t.taskId} className="p-4 md:px-6 flex items-center justify-between hover:bg-slate-500/5 transition-colors">
+                    <div className="flex flex-col min-w-0 pr-4">
+                      <div className="flex items-center space-x-2">
+                        <FolderOpen size={16} className={isDark ? "text-[#FF8533]" : "text-black"} />
+                        <span className={`text-xs font-bold truncate ${isDark ? 'text-white' : 'text-black'}`}>
+                          {t.filename}
+                        </span>
                       </div>
-                      
-                      <div className="flex items-center space-x-3">
-                        <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg border ${
-                          isSuccess ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
-                          isFailed ? 'bg-rose-500/10 border-rose-500/20 text-rose-400' :
-                          'bg-blue-500/10 border-blue-500/20 text-blue-400'
-                        }`}>
-                          {getStatusIcon(t.status)}
-                          <span className="text-xs font-semibold tracking-wide uppercase">
-                            {getStatusText(t.status)}
+                      <div className="flex items-center space-x-2 mt-1">
+                        <span className="text-[11px] font-mono text-slate-500">ID: {t.taskId.slice(0, 12)}…</span>
+                        {t.createdAt && (
+                          <span className="text-[10px] text-slate-500">
+                            • {new Date(t.createdAt).toLocaleDateString()}
                           </span>
-                        </div>
-
-                        {isSuccess && (
-                          <button
-                            onClick={() => setActiveRiskDoc({ docId: t.taskId, filename: t.filename })}
-                            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-bold transition-all shadow-sm"
-                            title="View Clause Risk & Deviation Audit"
-                          >
-                            <ShieldAlert size={14} className="text-rose-400" />
-                            <span>Risk Audit</span>
-                          </button>
                         )}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+
+                    <div className="flex items-center space-x-2.5 flex-shrink-0">
+                      {getStatusBadge(t.status)}
+
+                      {isSuccess && (
+                        <button
+                          onClick={() => setActiveRiskDoc({ docId: t.taskId, filename: t.filename })}
+                          className={`flex items-center space-x-1.5 px-3 py-1 rounded-xl text-xs font-black border transition-all ${
+                            isDark 
+                              ? 'bg-orange-500/15 hover:bg-orange-500 text-[#FF8533] hover:text-black border-orange-500/30' 
+                              : 'bg-black hover:bg-zinc-800 text-white border-black'
+                          }`}
+                          title="Open Clause Risk & Deviation Audit"
+                        >
+                          <ShieldAlert size={13} />
+                          <span>Risk Audit</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
