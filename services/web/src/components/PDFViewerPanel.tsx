@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, FileText, X } from 'lucide-react';
-import { API_BASE } from '../store/authStore';
+import React, { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, FileText, X, Loader2 } from 'lucide-react';
+import { API_BASE, getAuthHeaders } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 
 interface PDFViewerPanelProps {
@@ -21,12 +21,55 @@ export const PDFViewerPanel: React.FC<PDFViewerPanelProps> = ({
 
   const [currentPage, setCurrentPage] = useState<number>(initialPage);
   const [zoom, setZoom] = useState<number>(100);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const token = localStorage.getItem('localmind_token') || '';
-  
-  // Build streaming URL with token + dynamic server-side highlight query + anchor page
-  const highlightParam = highlightText ? `&highlight=${encodeURIComponent(highlightText.slice(0, 80))}` : '';
-  const fileUrl = `${API_BASE}/ingest/file/${docId}?token=${encodeURIComponent(token)}${highlightParam}&page=${currentPage}#page=${currentPage}`;
+  // Fetch document with Authorization header and convert to local Blob URL (Zero JWT in URLs)
+  useEffect(() => {
+    let active = true;
+    let currentBlobUrl: string | null = null;
+
+    const fetchPdfBlob = async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const highlightParam = highlightText ? `&highlight=${encodeURIComponent(highlightText.slice(0, 80))}` : '';
+        const endpoint = `${API_BASE}/ingest/file/${docId}?page=${currentPage}${highlightParam}`;
+        
+        const response = await fetch(endpoint, {
+          headers: getAuthHeaders(),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to load document (${response.status})`);
+        }
+
+        const blob = await response.blob();
+        if (active) {
+          currentBlobUrl = URL.createObjectURL(blob);
+          setBlobUrl(currentBlobUrl);
+        }
+      } catch (err: any) {
+        if (active) {
+          setLoadError(err.message || 'Error loading document');
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchPdfBlob();
+
+    return () => {
+      active = false;
+      if (currentBlobUrl) {
+        URL.revokeObjectURL(currentBlobUrl);
+      }
+    };
+  }, [docId, currentPage, highlightText]);
 
   return (
     <div className={`flex flex-col h-full border-l animate-slide-left w-full md:w-[500px] lg:w-[620px] flex-shrink-0 z-30 transition-all ${
@@ -121,12 +164,30 @@ export const PDFViewerPanel: React.FC<PDFViewerPanelProps> = ({
       )}
 
       {/* PDF Frame */}
-      <div className={`flex-1 overflow-hidden relative ${isDark ? 'bg-[#0B132B]' : 'bg-zinc-100'}`}>
-        <iframe
-          src={`${fileUrl}&zoom=${zoom}`}
-          title="Document PDF Viewer"
-          className="w-full h-full border-0"
-        />
+      <div className={`flex-1 overflow-hidden relative flex items-center justify-center ${isDark ? 'bg-[#0B132B]' : 'bg-zinc-100'}`}>
+        {loading && (
+          <div className="flex flex-col items-center justify-center space-y-3 z-10">
+            <Loader2 size={28} className="animate-spin text-orange-500" />
+            <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-zinc-600'}`}>
+              Streaming document securely...
+            </span>
+          </div>
+        )}
+
+        {loadError && !loading && (
+          <div className="p-6 text-center z-10">
+            <p className="text-sm font-bold text-rose-500 mb-1">Failed to load document</p>
+            <p className="text-xs text-zinc-500 dark:text-slate-400">{loadError}</p>
+          </div>
+        )}
+
+        {blobUrl && !loading && (
+          <iframe
+            src={`${blobUrl}#page=${currentPage}&zoom=${zoom}`}
+            title="Document PDF Viewer"
+            className="w-full h-full border-0 absolute inset-0"
+          />
+        )}
       </div>
     </div>
   );

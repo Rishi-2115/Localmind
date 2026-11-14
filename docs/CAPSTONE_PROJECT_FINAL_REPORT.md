@@ -1,11 +1,11 @@
-# LOCALMIND: PRIVACY-PRESERVING ON-PREMISES LEGAL AI COPILOT WITH AUTOMATED CLAUSE RISK AUDITING AND DETERMINISTIC TIERED SCALING
+# LOCALMIND: PRIVACY-PRESERVING ON-PREMISES ENTERPRISE AI COPILOT FOR DPDP ACT FIDUCIARIES (HEALTHCARE, BANKING & LEGAL) WITH AUTOMATED RISK AUDITING AND DETERMINISTIC TIERED SCALING
 
 ---
 
 ## PRELIMINARY PAGES
 
 ### Cover Page Information
-* **Project Title:** LocalMind: Privacy-Preserving On-Premises Legal AI Copilot with Automated Clause Risk Auditing and Deterministic Tiered Scaling
+* **Project Title:** LocalMind: Privacy-Preserving On-Premises Enterprise AI Copilot for DPDP Act Fiduciaries (Healthcare, Banking & Legal) with Automated Risk Auditing and Deterministic Tiered Scaling
 * **Degree:** Bachelor of Technology (B.Tech) in Computer Science & Engineering
 * **Institution:** Jaypee Institute of Information Technology (JIIT), Noida, Uttar Pradesh, India
 * **Academic Year:** 2026–2027
@@ -13,7 +13,7 @@
 ---
 
 ### Certificate
-This is to certify that the Capstone Project Report entitled **"LocalMind: Privacy-Preserving On-Premises Legal AI Copilot with Automated Clause Risk Auditing and Deterministic Tiered Scaling"** submitted by **Rishi Shukla (Enrollment No. [Assigned])**, along with team members, in partial fulfillment of the requirements for the award of the degree of **Bachelor of Technology in Computer Science & Engineering** from Jaypee Institute of Information Technology, Noida, is a record of authentic work carried out under our supervision and guidance.
+This is to certify that the Capstone Project Report entitled **"LocalMind: Privacy-Preserving On-Premises Enterprise AI Copilot for DPDP Act Fiduciaries (Healthcare, Banking & Legal) with Automated Risk Auditing and Deterministic Tiered Scaling"** submitted by **Rishi Shukla (Enrollment No. [Assigned])**, along with team members, in partial fulfillment of the requirements for the award of the degree of **Bachelor of Technology in Computer Science & Engineering** from Jaypee Institute of Information Technology, Noida, is a record of authentic work carried out under our supervision and guidance.
 
 To the best of our knowledge, the matter embodied in this report has not been submitted to any other University or Institute for the award of any degree or diploma.
 
@@ -32,7 +32,7 @@ Jaypee Institute of Information Technology, Noida
 ---
 
 ### Declaration of Originality
-We hereby declare that the research and implementation presented in this Capstone Project report entitled **"LocalMind: Privacy-Preserving On-Premises Legal AI Copilot"** is our own original work conducted at the Department of Computer Science & Engineering, Jaypee Institute of Information Technology, Noida. 
+We hereby declare that the research and implementation presented in this Capstone Project report entitled **"LocalMind: Privacy-Preserving On-Premises Enterprise AI Copilot for DPDP Act Fiduciaries"** is our own original work conducted at the Department of Computer Science & Engineering, Jaypee Institute of Information Technology, Noida. 
 
 All primary sources, code frameworks, algorithms, and citations have been duly acknowledged in the references section in accordance with standard academic ethics and institutional anti-plagiarism guidelines. This report contains no fabrication, falsification of data, or uncredited intellectual property.
 
@@ -50,15 +50,15 @@ We are deeply grateful to our Head of Department and institutional administrator
 ---
 
 ### Abstract
-Modern generative Artificial Intelligence (AI) and Retrieval-Augmented Generation (RAG) platforms rely predominantly on multi-tenant, cloud-hosted Large Language Model (LLM) APIs. In confidentiality-critical verticals—most notably corporate legal counsel, financial audit, and healthcare—transmitting proprietary contracts, privileged litigation briefs, and sensitive personally identifiable information (PII) to third-party cloud infrastructure presents severe compliance and regulatory violations under frameworks such as India’s Digital Personal Data Protection (DPDP) Act 2023 and the EU General Data Protection Regulation (GDPR). 
+Modern generative Artificial Intelligence (AI) and Retrieval-Augmented Generation (RAG) platforms rely predominantly on multi-tenant, cloud-hosted Large Language Model (LLM) APIs. In confidentiality-critical fiduciary verticals—including **Healthcare Systems & Hospitals** (handling Electronic Health Records and diagnostic telemetry), **Financial Institutions & Banks** (handling core banking transactions and credit risk data), and **Corporate Legal Counsel** (handling privileged contracts)—transmitting proprietary files and personal data to third-party cloud infrastructure presents severe compliance and regulatory violations under India’s **Digital Personal Data Protection (DPDP) Act 2023** (penalties up to ₹250 Crores per breach), RBI outsourcing circulars, and the Bar Council of India mandates.
 
-This Capstone Project presents **LocalMind**, an enterprise-grade, privacy-first local RAG copilot engineered to operate 100% on-premises without external network dependencies. LocalMind integrates an asynchronous ingestion pipeline (Celery, Redis, PyMuPDF, and FAISS), a multi-tenant FastAPI core with strict Role-Based Access Control (RBAC), and local quantized open-weights language models (`llama3.2:3b` and `nomic-embed-text`) served via Ollama. 
+This Capstone Project presents **LocalMind**, an enterprise-grade, privacy-first local RAG copilot engineered to operate 100% on-premises without external network dependencies. LocalMind integrates an asynchronous ingestion pipeline (Celery, Redis, PyMuPDF, and FAISS), a multi-tenant FastAPI core with strict Role-Based Access Control (RBAC), and local quantized open-weights language models (`llama3.2:3b` and `nomic-embed-text`) served via Ollama with zero external API calls.
 
-To overcome the performance and reliability limitations of conventional local RAG prototypes, this work implements four architectural innovations:
-1. **Automated Clause Risk & Deviation Scoring Engine**: Proactively detects, categorizes, and flags high-stakes contractual exposures (unlimited liability, unilateral indemnification, aggressive termination windows) against institutional playbooks.
+To overcome the performance, security, and verification limitations of conventional RAG prototypes, this work implements key architectural innovations:
+1. **Automated DPDP Act & Contractual Exposure Engine**: Proactively detects, categorizes, and flags high-stakes liabilities (unauthorized patient data licensing for AI training, cross-border data transfer, unlimited liability, unilateral indemnification, aggressive termination windows) against institutional playbooks.
 2. **Deterministic Tiered Scaling Architecture**: Packaged via Helm into three distinct operational profiles (`Small`, `Medium`, `Large`) with Vertical Pod Autoscaler (VPA) telemetry in `updateMode: "Off"`.
 3. **High-Concurrency Distributed Mutex & LRU Caching**: Solves vector index race conditions using distributed Redis locks (`lock:index:{tenant_id}`) and cuts MinIO deserialization latency via an in-process FAISS LRU cache.
-4. **Interactive Side-by-Side Verification Interface**: A split-screen React/Vite interface that synchronizes AI responses with an in-browser PDF viewer, scrolling directly to cited pages with anchor bounding highlights.
+4. **Interactive In-Document Verification & Zero-JWT Blob Streaming**: A dual-theme (Cyber Dark / Minimalist Light) split-screen React/Vite interface featuring in-document PyMuPDF dynamic highlighting, zero-JWT URL blob security, and one-click AI clause redline proposal generation.
 
 Empirical evaluation on local hardware demonstrated sub-4 ms semantic cache hits, an 11.9x vector search speedup via automatic `IndexFlatIP`-to-`IndexHNSWFlat` switching at 100,000 vectors, and near-linear ingestion throughput scaling from 188 docs/min (1 worker) to 751 docs/min (4 workers) with zero vector loss.
 
@@ -326,8 +326,9 @@ Whenever a document is ingested, the tenant index version increments ($V_{\text{
 | **API Framework** | FastAPI (Python 3.11/3.12) | Native async support, automatic OpenAPI/Swagger generation, Pydantic validation. Superior to Flask/Django. |
 | **Task Queue** | Celery + Redis | Industrial-standard asynchronous task queue with prefork process isolation. Superior to threading/multiprocessing. |
 | **Vector Index** | FAISS (Meta AI) | Highly optimized C++ vector search primitives with native AVX2/AVX-512 acceleration. Far lighter than Milvus/Pinecone. |
-| **Local LLM** | Llama-3.2:3b (Quantized) | SOTA performance in sub-4B parameter models; executes comfortably on 6–8 GB VRAM or modern CPU cores. |
+| **Local LLM** | Llama-3.2:3b (Quantized) | SOTA performance in sub-4B parameter models; executes comfortably on 6–8 GB VRAM or modern CPU cores. Configured with `keep_alive: 24h` and `num_predict: 512` for sub-second TTFT. |
 | **Embeddings** | Nomic-Embed-Text | 768-dimensional embeddings outperforming OpenAI `text-embedding-ada-002` on standard legal MTEB benchmarks. |
+| **In-Document Highlighting** | PyMuPDF (`fitz`) | Dynamic server-side vector highlight annotation on verbatim citation terms (`(1.0, 0.45, 0.0)` stroke) streamed via client-side Blob URLs. |
 
 ---
 
@@ -381,8 +382,10 @@ The system was evaluated on a standardized testing testbed reflecting a modern c
 | **TC-03** | `concurrency` | 3 workers writing 15 vectors to same tenant | All 15 vectors indexed with 0 data loss | Exactly 15 vectors verified in FAISS | **PASSED** |
 | **TC-04** | `retriever` | Query after tenant index version increment | Stale LRU cache evicted; index reloaded | Cache miss triggered; new vectors retrieved | **PASSED** |
 | **TC-05** | `risk_engine` | Unlimited liability clause in contract | Evaluated as `CRITICAL` risk with fee-cap advice | `CRITICAL` risk assigned; counter-proposal generated | **PASSED** |
-| **TC-06** | `risk_engine` | 7-day termination notice for convenience | Evaluated as `HIGH` risk with 30-day notice advice | `HIGH` risk assigned; 30-day notice advised | **PASSED** |
-| **TC-07** | `pdf_viewer` | Citation click in Copilot Chat | PDF slides out and jumps to cited page | Verified; iframe loaded with valid auth token | **PASSED** |
+| **TC-06** | `risk_engine` | Patient EHR licensing for commercial AI training | Flagged as `CRITICAL` DPDP Act breach | `CRITICAL` assigned; strike-out recommendation emitted | **PASSED** |
+| **TC-07** | `isolation` | Tenant B accesses Tenant A document/risk | Strictly returns 404 Not Found (zero leak) | Verified; cross-tenant data completely inaccessible | **PASSED** |
+| **TC-08** | `pdf_auth` | Accessing PDF stream with query token | Token in query rejected with 401; Blob used | 401 Unauthorized; token scrubbed from URL | **PASSED** |
+| **TC-09** | `redlining` | User requests counter-clause on liability | Streams balanced redline amendment via SSE | Generated balanced mutual cap with strategy note | **PASSED** |
 
 ## 4.4 Cyber Security & Safety Protocols
 1. **Zero-Trust Network Isolation**: Kubernetes `NetworkPolicy` isolates database, cache, and object storage pods; only the API pod can initiate database queries.
@@ -536,6 +539,26 @@ This Capstone Project successfully conceptualized, implemented, and validated **
   - Developed the React/Tailwind user interface and Vite build configurations.
   - Implemented the split-screen interactive PDF viewer and synchronized citation click navigation.
 
-### Annexure III: Sustainability & Environmental Statement
+### Annexure III: Project Outcome & Proof of Working Application / Product
+
+#### 1. Nature of Outcome
+* **Outcome Category:** Functional Engineering Software Application / Enterprise Product Prototype
+* **Title:** LocalMind — Air-Gapped Privacy-Preserving Enterprise AI Copilot for DPDP Act Fiduciaries
+* **Target Audience:** Data Fiduciaries under DPDP Act 2023, including Healthcare Systems & Hospitals (EHR/Clinical Records), Banking & Financial Institutions (CBS/Outsourcing Contracts), and Corporate Legal Counsel.
+
+#### 2. Source Code & Packaging Artifacts
+* **Repository Architecture:** Monorepo with dedicated `services/api`, `services/web`, `services/ingestion`, `ml/`, and `infra/helm`.
+* **Container Images & Multi-Arch:** Built with Docker Buildx for standard x86_64 and arm64 architectures.
+* **Kubernetes Orchestration:** Production-linted Helm charts (`infra/helm/localmind/`) featuring `Small`, `Medium`, and `Large` profiles.
+
+#### 3. Verification Deliverables & Screenshots (Embedded in Formal Submission)
+1. **Interactive Copilot Chat & Instant Citations:** Grounded legal Q&A with exact page citations and sub-second prompt evaluation.
+2. **Dynamic In-Document Highlighting:** PyMuPDF server-side annotations rendering orange citation boxes directly on contract text.
+3. **Automated DPDP Act & Contract Risk Audit:** Instant vulnerability matrix categorizing Unlimited Liability, AI Model Training Rights, and Asymmetric Termination.
+4. **AI Clause Redlining & Counter-Proposal Modal:** One-click generation of balanced contractual amendments and negotiation notes.
+5. **Tamper-Evident SHA-256 Audit Trail:** Immutable activity ledger recording all queries, document hashes, and user actions for DPDP Board inspection.
+6. **Multi-Tenant Security & Isolation:** Automated test suite proving zero data leakage between competing institutional tenants.
+
+### Annexure IV: Sustainability & Environmental Statement
 The LocalMind system is intentionally engineered for low-power edge computing. By leveraging optimized quantized open-weights models (`llama3.2:3b`) capable of running on consumer CPUs or low-wattage GPUs (under 115W TDP), LocalMind avoids the immense electrical demand (often $>700\text{W}$ per accelerator) characteristic of commercial hyperscaler server farms. This decentralized edge-computing paradigm presents an environmentally sustainable alternative for institutional AI adoption.
 

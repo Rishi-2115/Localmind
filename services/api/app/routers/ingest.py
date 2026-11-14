@@ -328,7 +328,20 @@ async def get_document_contract_risks(
 ):
     """
     Retrieve automated clause risk & deviation assessment for an ingested document.
+    Returns 404 if the document does not exist or belongs to another tenant.
     """
+    # 1. Enforce strict document ownership check
+    doc_check = await db.execute(
+        select(Document).where(
+            (Document.id == doc_id) & (Document.tenant_id == current_user.tenant_id)
+        )
+    )
+    if not doc_check.scalars().first():
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found or access denied for this tenant"
+        )
+
     result = await db.execute(
         select(ContractRisk)
         .where(

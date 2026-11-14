@@ -12,9 +12,11 @@ import {
   Eye, 
   ShieldAlert,
   CheckCircle2,
-  Trash2
+  Trash2,
+  FileEdit,
+  Loader2
 } from 'lucide-react';
-import { getAuthHeaders, API_BASE } from '../store/authStore';
+import { getAuthHeaders, API_BASE, useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import { PDFViewerPanel } from '../components/PDFViewerPanel';
 import { ContractRiskModal } from '../components/ContractRiskModal';
@@ -33,35 +35,46 @@ interface Message {
   isCached?: boolean;
 }
 
-const STORAGE_CHAT_KEY = 'localmind_chat_messages_v1';
-
 const Chat: React.FC = () => {
   const { theme } = useThemeStore();
   const isDark = theme === 'dark';
+  const { tenantId, userId } = useAuthStore();
 
-  const [messages, setMessages] = useState<Message[]>(() => {
+  // Dynamic storage key scoped per tenant and user
+  const chatStorageKey = tenantId && userId 
+    ? `localmind_chat_${tenantId}_${userId}` 
+    : 'localmind_chat_messages_v1';
+
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  // Load chat on user/tenant switch
+  useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_CHAT_KEY);
-      return saved ? JSON.parse(saved) : [];
+      const saved = localStorage.getItem(chatStorageKey);
+      setMessages(saved ? JSON.parse(saved) : []);
     } catch {
-      return [];
+      setMessages([]);
     }
-  });
+  }, [chatStorageKey]);
+
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [expandedCitations, setExpandedCitations] = useState<Record<number, boolean>>({});
   const [activeViewerDoc, setActiveViewerDoc] = useState<{ docId: string; page: number; snippet?: string } | null>(null);
   const [activeRiskDoc, setActiveRiskDoc] = useState<{ docId: string; filename: string } | null>(null);
+  const [redlineModalData, setRedlineModalData] = useState<{ clause: string; preview: string; result?: string; loading?: boolean } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_CHAT_KEY, JSON.stringify(messages));
+      if (messages.length > 0) {
+        localStorage.setItem(chatStorageKey, JSON.stringify(messages));
+      }
     } catch (e) {
       console.warn('Failed to persist chat messages:', e);
     }
-  }, [messages]);
+  }, [messages, chatStorageKey]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -165,6 +178,53 @@ const Chat: React.FC = () => {
     }
   };
 
+  const handleRequestRedline = async (clauseText: string) => {
+    setRedlineModalData({ clause: clauseText, preview: clauseText, result: '', loading: true });
+    try {
+      const response = await fetch(`${API_BASE}/query/redline`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ clause_text: clauseText }),
+      });
+
+      if (!response.ok) throw new Error('Failed to start redline stream');
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder('utf-8');
+      if (!reader) throw new Error('No readable stream');
+
+      let accumulated = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunkStr = decoder.decode(value, { stream: true });
+        const lines = chunkStr.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const jsonStr = line.replace('data: ', '').trim();
+            if (!jsonStr) continue;
+            try {
+              const event = JSON.parse(jsonStr);
+              if (event.token) {
+                accumulated += event.token;
+                setRedlineModalData((prev) => (prev ? { ...prev, result: accumulated, loading: false } : null));
+              }
+            } catch (e) {
+              console.error('SSE parse error:', e);
+            }
+          }
+        }
+      }
+      setRedlineModalData((prev) => (prev ? { ...prev, loading: false } : null));
+    } catch (err: any) {
+      setRedlineModalData((prev) => (prev ? { ...prev, result: `Redline Error: ${err.message}`, loading: false } : null));
+    }
+  };
+
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
     e.target.style.height = 'auto';
@@ -191,10 +251,10 @@ const Chat: React.FC = () => {
           </div>
           <div>
             <h1 className={`text-base font-black tracking-tight ${isDark ? 'text-white' : 'text-black'}`}>
-              Legal Reasoning & RAG Copilot
+              Enterprise DPDPA Copilot
             </h1>
             <p className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-zinc-500'}`}>
-              Air-Gapped • llama3.2:3b • 768-dim Vectors • 100% Deterministic Citations
+              Zero Egress • Hospitals, Legal & Enterprises • llama3.2:3b • 100% Deterministic Citations
             </p>
           </div>
         </div>
@@ -204,7 +264,7 @@ const Chat: React.FC = () => {
             onClick={() => {
               if (window.confirm('Reset conversation history?')) {
                 setMessages([]);
-                localStorage.removeItem(STORAGE_CHAT_KEY);
+                localStorage.removeItem(chatStorageKey);
               }
             }}
             className={`flex items-center space-x-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border transition-all ${
@@ -233,19 +293,20 @@ const Chat: React.FC = () => {
               <Bot size={40} />
             </div>
             <h2 className={`text-2xl font-black mb-2 tracking-tight ${isDark ? 'text-white' : 'text-black'}`}>
-              Local Legal Intelligence Ready
+              Air-Gapped Institutional Intelligence Ready
             </h2>
             <p className={`text-sm max-w-lg leading-relaxed ${isDark ? 'text-slate-400' : 'text-zinc-600'}`}>
-              Upload contracts in the <strong className={isDark ? "text-[#FF8533]" : "text-black"}>Documents & Ingest</strong> tab. 
-              Ask specific clause questions, compare liabilities, or audit covenants with zero cloud data transmission.
+              Upload contracts, hospital patient data agreements, or policy records in <strong className={isDark ? "text-[#FF8533]" : "text-black"}>Documents & Ingest</strong>. 
+              Query liabilities, audit cross-border transfer covenants, and redline clauses with zero external data transmission.
             </p>
 
             {/* Quick Action Badges */}
-            <div className="flex flex-wrap gap-2 mt-6 max-w-md justify-center">
+            <div className="flex flex-wrap gap-2 mt-6 max-w-lg justify-center">
               {[
                 "What is the limitation of liability cap?",
-                "What are the termination notice windows?",
-                "Are there unilateral indemnification terms?",
+                "Are hospital patient records licensed for AI training?",
+                "What are the cross-border data transfer restrictions?",
+                "What are the breach notification obligations?",
               ].map((suggestion, idx) => (
                 <button
                   key={idx}
@@ -396,6 +457,19 @@ const Chat: React.FC = () => {
                                         <ShieldAlert size={12} />
                                         <span>Risk Audit</span>
                                       </button>
+
+                                      <button
+                                        onClick={() => handleRequestRedline(citation.preview)}
+                                        className={`inline-flex items-center space-x-1.5 text-[11px] font-black px-3 py-1 rounded-xl border transition-all ${
+                                          isDark 
+                                            ? 'bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-black border-emerald-500/40' 
+                                            : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                                        }`}
+                                        title="Propose a balanced counter-clause amendment"
+                                      >
+                                        <FileEdit size={12} />
+                                        <span>Redline Clause</span>
+                                      </button>
                                     </div>
                                   </div>
 
@@ -495,6 +569,96 @@ const Chat: React.FC = () => {
             });
           }}
         />
+      )}
+
+      {/* Attorney Redline Amendment Modal */}
+      {redlineModalData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+          <div className={`w-full max-w-2xl rounded-3xl p-6 border shadow-2xl overflow-hidden max-h-[85vh] flex flex-col ${
+            isDark 
+              ? 'bg-[#0B132B] border-emerald-500/30 text-white' 
+              : 'bg-white border-zinc-200 text-black'
+          }`}>
+            <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-slate-800">
+              <div className="flex items-center space-x-2.5">
+                <div className={`p-2 rounded-xl ${
+                  isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-800'
+                }`}>
+                  <FileEdit size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black">AI Contract Redline & Counter-Proposal</h3>
+                  <p className="text-xs text-zinc-500 dark:text-slate-400 font-semibold">
+                    Balanced revision for contract negotiation under standard fiduciary standards.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setRedlineModalData(null)}
+                className="p-1.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-slate-800 text-zinc-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Target clause preview */}
+            <div className="my-4 p-3 rounded-2xl bg-zinc-100 dark:bg-slate-900 border border-zinc-200 dark:border-slate-800">
+              <span className="text-[10px] font-black uppercase tracking-wider text-orange-500 dark:text-orange-400 block mb-1">
+                Target Contract Clause
+              </span>
+              <p className="text-xs italic text-zinc-700 dark:text-slate-300">
+                "{redlineModalData.clause}"
+              </p>
+            </div>
+
+            {/* AI Generated Redline Result */}
+            <div className="flex-1 overflow-y-auto pr-2 space-y-4 text-sm leading-relaxed">
+              {redlineModalData.loading && !redlineModalData.result && (
+                <div className="py-8 flex flex-col items-center justify-center space-y-3">
+                  <Loader2 size={28} className="animate-spin text-emerald-500" />
+                  <span className="text-xs font-bold text-zinc-500 dark:text-slate-400">
+                    Synthesizing balanced legal amendment and negotiation strategy...
+                  </span>
+                </div>
+              )}
+
+              {redlineModalData.result && (
+                <div className="prose dark:prose-invert max-w-none text-xs md:text-sm">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {redlineModalData.result}
+                  </ReactMarkdown>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-4 border-t border-zinc-200 dark:border-slate-800 flex items-center justify-between">
+              <span className="text-[11px] text-zinc-500 dark:text-slate-400">
+                100% Local Inference • Zero Egress
+              </span>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => {
+                    if (redlineModalData.result) {
+                      navigator.clipboard.writeText(redlineModalData.result);
+                      alert('Redline proposal copied to clipboard!');
+                    }
+                  }}
+                  disabled={!redlineModalData.result}
+                  className="px-4 py-2 text-xs font-black rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white transition-all disabled:opacity-50"
+                >
+                  Copy Redline Proposal
+                </button>
+                <button
+                  onClick={() => setRedlineModalData(null)}
+                  className="px-4 py-2 text-xs font-bold rounded-xl bg-zinc-200 hover:bg-zinc-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-black dark:text-white transition-all"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

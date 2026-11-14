@@ -6,6 +6,8 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   userEmail: string | null;
+  tenantId: string | null;
+  userId: string | null;
   error: string | null;
   isLoading: boolean;
   requiresPasswordChange: boolean;
@@ -16,10 +18,32 @@ interface AuthState {
   logout: () => void;
 }
 
+const parseJwtPayload = (token: string | null) => {
+  if (!token) return { tenantId: null, userId: null };
+  try {
+    const parts = token.split('.');
+    if (parts.length === 3) {
+      const payload = JSON.parse(atob(parts[1]));
+      return {
+        tenantId: payload.tenant_id || null,
+        userId: payload.sub ? String(payload.sub) : null,
+      };
+    }
+  } catch {
+    // ignore
+  }
+  return { tenantId: null, userId: null };
+};
+
+const initialToken = localStorage.getItem('localmind_token');
+const initialMeta = parseJwtPayload(initialToken);
+
 export const useAuthStore = create<AuthState>((set) => ({
-  token: localStorage.getItem('localmind_token'),
-  isAuthenticated: !!localStorage.getItem('localmind_token'),
+  token: initialToken,
+  isAuthenticated: !!initialToken,
   userEmail: localStorage.getItem('localmind_email'),
+  tenantId: initialMeta.tenantId,
+  userId: initialMeta.userId,
   error: null,
   isLoading: false,
   requiresPasswordChange: false,
@@ -58,10 +82,13 @@ export const useAuthStore = create<AuthState>((set) => ({
       const data = await res.json();
       localStorage.setItem('localmind_token', data.access_token);
       localStorage.setItem('localmind_email', email);
+      const meta = parseJwtPayload(data.access_token);
       set({
         token: data.access_token,
         isAuthenticated: true,
         userEmail: email,
+        tenantId: meta.tenantId,
+        userId: meta.userId,
         isLoading: false,
         requiresPasswordChange: false,
         pendingEmail: null,
@@ -93,10 +120,13 @@ export const useAuthStore = create<AuthState>((set) => ({
       const data = await res.json();
       localStorage.setItem('localmind_token', data.access_token);
       localStorage.setItem('localmind_email', email);
+      const meta = parseJwtPayload(data.access_token);
       set({
         token: data.access_token,
         isAuthenticated: true,
         userEmail: email,
+        tenantId: meta.tenantId,
+        userId: meta.userId,
         isLoading: false,
         requiresPasswordChange: false,
         pendingEmail: null,
@@ -109,12 +139,21 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: () => {
+    // Clear auth credentials and any active session keys
+    const currentToken = localStorage.getItem('localmind_token');
+    const { tenantId, userId } = parseJwtPayload(currentToken);
+    if (tenantId && userId) {
+      localStorage.removeItem(`localmind_chat_${tenantId}_${userId}`);
+    }
+    localStorage.removeItem('localmind_chat_messages_v1');
     localStorage.removeItem('localmind_token');
     localStorage.removeItem('localmind_email');
     set({
       token: null,
       isAuthenticated: false,
       userEmail: null,
+      tenantId: null,
+      userId: null,
       requiresPasswordChange: false,
       pendingEmail: null,
       pendingCurrentPassword: null,

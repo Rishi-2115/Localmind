@@ -88,7 +88,7 @@ function App() {
                 <p className={`text-[10px] font-extrabold tracking-widest uppercase mt-1 ${
                   isDark ? 'text-[#FF8533]' : 'text-zinc-500'
                 }`}>
-                  Legal AI Copilot
+                  Enterprise DPDPA Copilot
                 </p>
               </div>
             </div>

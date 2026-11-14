@@ -11,7 +11,7 @@ from ..core.database import get_db
 from ..models.models import User, AuditLog
 from ml.cache.semantic_cache import semantic_cache
 from ml.retrieval.retriever import retriever
-from ml.prompts.legal import LEGAL_QA_PROMPT
+from ml.prompts.legal import LEGAL_QA_PROMPT, LEGAL_REDLINE_PROMPT
 from ..core.circuit_breaker import ollama_circuit_breaker
 from ..core.config import settings
 import logging
@@ -25,13 +25,22 @@ class QueryRequest(BaseModel):
     query: str
 
 
+class RedlineRequest(BaseModel):
+    clause_text: str
+    context: str = ""
+
+
 async def _embed_query_with_fallback(query: str) -> list[float]:
     """Get embedding for a query string via Ollama with circuit breaker fallback."""
     async def embed_call():
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 f"{settings.OLLAMA_BASE_URL}/api/embed",
-                json={"model": settings.EMBEDDING_MODEL, "input": query},
+                json={
+                    "model": settings.EMBEDDING_MODEL,
+                    "input": query,
+                    "keep_alive": "24h",
+                },
             )
             response.raise_for_status()
             return response.json()["embeddings"][0]
@@ -51,6 +60,7 @@ async def generate_response_with_citations(
     """
     Stream tokens from Ollama with citations in JSON format.
     Yields dicts: {"token": "<text>", "citations": [...]}
+    Optimized with keep_alive='24h', num_predict=512, temperature=0.1.
     """
     async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(
@@ -59,6 +69,12 @@ async def generate_response_with_citations(
                 "model": settings.DEFAULT_MODEL,
                 "messages": [{"role": "user", "content": prompt}],
                 "stream": True,
+                "keep_alive": "24h",
+                "options": {
+                    "temperature": 0.1,
+                    "num_predict": 512,
+                    "num_ctx": 4096,
+                },
             },
         )
         response.raise_for_status()
@@ -72,6 +88,7 @@ async def generate_response_with_citations(
 
 
 @router.post("")
+@router.post("/stream")
 async def execute_query(
     request: QueryRequest,
     current_user: User = Depends(get_current_active_user),
@@ -122,9 +139,9 @@ async def execute_query(
         logger.info(f"Embedding query for tenant {tenant_id}")
         query_emb = await _embed_query_with_fallback(request.query)
 
-        # ── 3. FAISS top-5 retrieval ─────────────────────────────────
-        logger.info(f"Retrieving top-5 docs for tenant {tenant_id}")
-        retrieved_docs = await retriever.retrieve(tenant_id, query_emb, top_k=5)
+        # ── 3. FAISS top-3 retrieval (optimized for fast low-latency context) ──
+        logger.info(f"Retrieving top-3 docs for tenant {tenant_id}")
+        retrieved_docs = await retriever.retrieve(tenant_id, query_emb, top_k=3)
         
         if not retrieved_docs:
             logger.warning(f"No documents retrieved for tenant {tenant_id}")
@@ -167,7 +184,10 @@ async def execute_query(
 
         async def get_stream():
             try:
-                # generate_response_with_citations is now an async generator itself
+                # 1. Immediately emit citations metadata to client (Instant TTFT feedback)
+                yield {"data": json.dumps({"token": "", "citations": citations})}
+
+                # 2. Stream tokens from LLM
                 async for chunk_data in generate_response_with_citations(
                     prompt, tenant_id, request.query, citations
                 ):
@@ -191,3 +211,44 @@ async def execute_query(
         )
         await db.commit()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/redline")
+async def generate_clause_redline(
+    request: RedlineRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Generate an attorney-grade balanced redline amendment for a flagged clause.
+    """
+    prompt = LEGAL_REDLINE_PROMPT.format(
+        context=request.context or "Standard Commercial Software Services Agreement.",
+        clause=request.clause_text,
+    )
+
+    async def get_redline_stream():
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                f"{settings.OLLAMA_BASE_URL}/api/chat",
+                json={
+                    "model": settings.DEFAULT_MODEL,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "stream": True,
+                    "keep_alive": "24h",
+                    "options": {
+                        "temperature": 0.2,
+                        "num_predict": 600,
+                    },
+                },
+            )
+            response.raise_for_status()
+
+            async for line in response.aiter_lines():
+                if line:
+                    data = json.loads(line)
+                    chunk = data.get("message", {}).get("content", "")
+                    if chunk:
+                        yield {"data": json.dumps({"token": chunk})}
+
+    return EventSourceResponse(get_redline_stream())

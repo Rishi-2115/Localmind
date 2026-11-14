@@ -25,6 +25,7 @@ CLAUSE_PATTERNS = {
     "termination": re.compile(r"(termination for convenience|termination without cause|written notice of termination|days prior written notice)", re.IGNORECASE),
     "non_compete": re.compile(r"(non-compete|non compete|restrictive covenant|covenant not to compete|solicitation of customers)", re.IGNORECASE),
     "jurisdiction": re.compile(r"(governing law|jurisdiction|dispute resolution|courts of|exclusive jurisdiction|arbitration)", re.IGNORECASE),
+    "dpdpa_health_data": re.compile(r"(patient data|health records|personal data|ai training|data license|cross-border|dpdpa|fiduciary|consent withdrawal|breach notice)", re.IGNORECASE),
 }
 
 RISK_EVALUATION_PROMPT = """You are an expert corporate legal auditor. Evaluate the following contract clause for legal, operational, and commercial exposure.
@@ -133,6 +134,25 @@ def analyze_clause_with_heuristics(category: str, text: str, page: int) -> Dict[
             "page_number": page,
             "reasoning": f"Balanced termination notice period ({days} days) within market standard.",
             "recommendation": "Confirm post-termination data transition obligations are explicitly documented."
+        }
+
+    if category == "dpdpa_health_data":
+        if "ai models" in lower or "train" in lower or "perpetual" in lower or "worldwide license" in lower:
+            return {
+                "clause_type": "Data Privacy & AI Training (DPDP Act)",
+                "risk_level": "CRITICAL",
+                "excerpt": text[:300] + "...",
+                "page_number": page,
+                "reasoning": "Vendor claims perpetual, worldwide rights to use confidential personal/patient data to train third-party AI models, violating DPDP Act 2023 purpose limitation safeguards.",
+                "recommendation": "Strike out all model training rights; explicitly specify that client data is strictly segregated and cannot be utilized for machine learning."
+            }
+        return {
+            "clause_type": "Data Protection & Fiduciary Covenant",
+            "risk_level": "LOW",
+            "excerpt": text[:300] + "...",
+            "page_number": page,
+            "reasoning": "Standard statutory commitment adhering to applicable data privacy standards.",
+            "recommendation": "Mandate explicit 72-hour security incident notification to Data Protection Board."
         }
 
     return {

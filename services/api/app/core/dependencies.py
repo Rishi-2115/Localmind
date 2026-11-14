@@ -8,14 +8,12 @@ from .config import settings
 from .database import get_db
 from ..models.models import User
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
 async def get_current_user(
-    token_header: Optional[str] = Depends(oauth2_scheme),
-    token_query: Optional[str] = Query(None, alias="token"),
+    token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db)
 ):
-    token = token_header or token_query
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
